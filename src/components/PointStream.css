@@ -1,0 +1,30 @@
+.buttons {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px; /* Space between rows */
+}
+.row {
+    display: flex;
+    flex-direction: row;
+    gap: 4px; /* Space between columns */
+}
+.button {
+    padding: 4px 12px;
+    cursor: pointer;
+    text-align: center;
+    background-color: #ddd;
+    border: none;
+    font-size: 14px;
+    border-radius: 5px;
+    color: #333;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.button.active {
+    background-color: #007bff;
+    color: white;
+    font-weight: bold;
+    border: 1px solid #0056b3;
+}
