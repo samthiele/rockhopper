@@ -1,12 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from 'react-router-dom';
 import * as THREE from "three";
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { openGroup, HTTPStore, slice, NestedArray } from "zarr";
 import chroma from 'chroma-js';
 import './PointStream.css';
 
 const LOAD_INTERVAL = 100; // ms to sleep between loading new chunks
+const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+const lineMaterial = new LineMaterial({ color: 0xffff00, linewidth: 5, vertexColors: false });
 
 // recompute a point cloud colour array from the source
 // (typically using a different visualisation style)
@@ -52,20 +57,12 @@ function colourise(cloud, array, settings = null, key = null, offset=0){
   cloud.geometry.attributes.color.needsUpdate = true;
 }
 
-const PointStream = ({ index }) => {
-  const mountRef = useRef(null);
-  const controlsRef = useRef(null);  
-  const cameraRef = useRef(null);  
-  const seedPoints = useRef(null);
-  const densePoints = useRef(null);
-  const selectedPointsRef = useRef([]); // Stores selected points
-  const spheresRef = useRef([]); // Stores spheres for visualization
-  const lineRef = useRef(null); // Stores the line
-  const planeRef = useRef(null); // Stores the plane
-
-  // three.js components
-  const [scene] = useState(new THREE.Scene());
-  const [renderer, setRenderer] = useState(null);
+const PointStream = ({ index, annotations, setAnnotations,
+                       scene, renderer, cameraRef, controlsRef, 
+                       activeStyle, setActiveStyle}) => {
+  const mountRef = useRef(null); // three.js mount component
+  const seedPoints = useRef(null); // seeds for streaming dense point cloud
+  const densePoints = useRef(null); // dense point cloud
 
   // point streaming state
   const [source, setSource] = useState(null);
@@ -75,28 +72,32 @@ const PointStream = ({ index }) => {
   const [streamed, setStreamed] = useState({}); // track which chunks have been loaded
   const [streamCount, setStreamCount] = useState(0); // number of points already streamed
 
-  // visualisation properties
-  const [activeStyle, setActiveStyle] = useState(null);
+  // annotation states
+  const [selection, setSelection] = useState([]);
+  const spheresRef = useRef([]); // Stores annotation spheres
+  const lineRef = useRef([]); // Stores annotation lines
+  const planeRef = useRef([]); // Stores annotation planes
 
   // Setup three.js scene, renderer, camera and view controls
   useEffect(() => {
     const mount = mountRef.current;
     const width = mount.clientWidth;
     const height = mount.clientHeight;
+    
+    // Create a new Scene
+    scene.current = new THREE.Scene();
 
     // Initialize Renderer
-    const newRenderer = new THREE.WebGLRenderer({ antialias: true });
-    newRenderer.setSize(width, height);
-    mount.appendChild(newRenderer.domElement);
-    setRenderer(newRenderer);
+    renderer.current = new THREE.WebGLRenderer({ antialias: true });
+    renderer.current.setSize(width, height);
+    mount.appendChild(renderer.current.domElement);
 
     // Initialize Camera
-    const newCamera = new THREE.PerspectiveCamera(60, width / height, 0.1, 5000);
-    newCamera.up.set(0, 0, 1);
-    cameraRef.current = newCamera; // update reference 
+    cameraRef.current = new THREE.PerspectiveCamera(60, width / height, 0.1, 5000);
+    cameraRef.current.up.set(0, 0, 1);
 
     // Orbit Controls
-    const controls = new OrbitControls(newCamera, newRenderer.domElement);
+    const controls = new OrbitControls(cameraRef.current, renderer.current.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controls.screenSpacePanning = true;
@@ -104,25 +105,25 @@ const PointStream = ({ index }) => {
 
     // Handle Resize
     const handleResize = () => {
-      newRenderer.setSize(mount.clientWidth, mount.clientHeight);
+      renderer.current.setSize(mount.clientWidth, mount.clientHeight);
       cameraRef.current.aspect = mount.clientWidth / mount.clientHeight;
       cameraRef.current.updateProjectionMatrix();
       controlsRef.current.update();
     };
     window.addEventListener("resize", handleResize);
-
+    
     // Animation loop
     const animate = () => {
       // render
       requestAnimationFrame(animate);
       controls.update();
-      newRenderer.render(scene, newCamera);
+      renderer.current.render(scene.current, cameraRef.current);
     };
     animate();
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      mount.removeChild(newRenderer.domElement);
+      mount.removeChild(renderer.current.domElement);
       controls.dispose();
     };
   }, []);
@@ -132,54 +133,39 @@ const PointStream = ({ index }) => {
   useEffect(()=>{
     if (!controlsRef || !cameraRef) return;
     const site = params.site;
-    if (site in index.sites){
-      const center = new THREE.Vector3(...index.sites[site].tgt);
-      cameraRef.current.position.set(...index.sites[site].pos);
+    if (site in index.current.sites){
+      const center = new THREE.Vector3(...index.current.sites[site].tgt);
+      cameraRef.current.position.set(...index.current.sites[site].pos);
       cameraRef.current.lookAt(center);
       controlsRef.current.target.copy(center);
       controlsRef.current.update();
     } else if (site === 'downloadPoints'){
       console.log("TODO - download our point cloud as CSV");
     }
-  },[cameraRef, controlsRef, renderer, scene, params]);
+  },[params]);
 
-  // Handle click events
+  // Handle click and key events
   useEffect(() => {
-    if (!renderer || !cameraRef || !scene) return;
+    if (!renderer || !cameraRef) return;
 
     const getIntersects = ( event ) => {
-      const rect = renderer.domElement.getBoundingClientRect();
+      const rect = renderer.current.domElement.getBoundingClientRect();
       const mouse = new THREE.Vector2(
         ((event.clientX - rect.left) / rect.width) * 2 - 1,
         -((event.clientY - rect.top) / rect.height) * 2 + 1
       )
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouse, cameraRef.current);
-      return raycaster.intersectObjects(scene.children, true)
+      return raycaster.intersectObjects(scene.current.children, true)
     }
+
     const handleSingleClick = (event) => {
       if (!event.shiftKey) return; // Only if Shift is held
       const intersects = getIntersects(event);
       if (intersects.length > 0) {
-        const selectedPoint = intersects[0].point;
-
-        // Add a yellow sphere to highlight the point
-        const sphereGeometry = new THREE.SphereGeometry(1, 16, 16);
-        const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-        sphere.position.copy(selectedPoint);
-        scene.add(sphere);
-        spheresRef.current.push(sphere);
-
-        // Store the selected point
-        selectedPointsRef.current.push(selectedPoint);
-
-        // Update visualizations
-        if (selectedPointsRef.current.length === 2) {
-          drawLine(selectedPointsRef.current[0], selectedPointsRef.current[1]);
-        } else if (selectedPointsRef.current.length === 3) {
-          drawPlane(selectedPointsRef.current[0], selectedPointsRef.current[1], selectedPointsRef.current[2]);
-        }
+        const selectedPoint = intersects[0].point.clone();
+        selection.push(selectedPoint)
+        setSelection([ ...selection ]); // update selection
       }
     };
 
@@ -191,22 +177,75 @@ const PointStream = ({ index }) => {
         controlsRef.current.update();
       }
     };
+    // keydown events
+    const handleKeyDown = (event) => {
+      if (event.key === 'Enter') {
+        const newAnnot = {...annotations};
 
-    renderer.domElement.addEventListener("dblclick", handleDoubleClick);
-    renderer.domElement.addEventListener("click", handleSingleClick);
-    return () => {
-      renderer.domElement.removeEventListener("dblclick", handleDoubleClick);
-      renderer.domElement.removeEventListener("click", handleSingleClick);
+        // add geometry to annotations
+        if (selection.length === 2) {
+          const v1 = selection[0];
+          const v2 = selection[1];
+          const direction = new THREE.Vector3().subVectors(v2, v1).normalize();
+          const trend = (Math.atan2(direction.x, direction.y) * 180) / Math.PI;
+          const plunge = (Math.asin(direction.z) * 180) / Math.PI;
+          const distance = v1.distanceTo(v2);
+          newAnnot.lines.push({
+            verts: [v1, v2],
+            trend: trend < 0 ? trend + 360 : trend,
+            plunge,
+            length: distance,
+          });
+        } else if (selection.length === 3) {
+          const v1 = selection[0];
+          const v2 = selection[1];
+          const v3 = selection[2];
+          const normal = new THREE.Vector3()
+            .crossVectors(new THREE.Vector3().subVectors(v2, v1), new THREE.Vector3().subVectors(v3, v1))
+            .normalize();
+          const dip = (Math.acos(Math.abs(normal.z)) * 180) / Math.PI;
+          let strike = (Math.atan2(normal.x, normal.y) * 180) / Math.PI;
+          if (strike < 0) strike += 360;
+          const dipdir = (strike + 90) % 360;
+          newAnnot.planes.push({
+            verts: [v1, v2, v3],
+            strike,
+            dip,
+            dipdir,
+          });
+        } else if (selection.length > 3) {
+          let totalLength = 0;
+          for (let i = 0; i < selection.length - 1; i++) {
+            totalLength += selection[i].distanceTo(selection[i + 1]);
+          }
+          newAnnot.traces.push({
+            verts: [...selection],
+            length: totalLength,
+          });
+        }
+        setAnnotations(newAnnot);
+        setSelection([]); // clear selection
+      } else if (event.key === 'Escape'){
+        setSelection([]); // clear selection
+      }
     };
-  }, [renderer, cameraRef, scene]);
+    document.addEventListener("keydown", handleKeyDown, false);
+    renderer.current.domElement.addEventListener("dblclick", handleDoubleClick);
+    renderer.current.domElement.addEventListener("click", handleSingleClick);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      renderer.current.domElement.removeEventListener("dblclick", handleDoubleClick);
+      renderer.current.domElement.removeEventListener("click", handleSingleClick);
+    };
+  }, [selection]);
   
   // Load seeds (chunk centers) and draw them
   useEffect(()=> {
-    if (!controlsRef || !cameraRef.current) return;
+    if (!controlsRef.current || !cameraRef.current) return;
     async function loadZarr() {
       try {
         // connect to zarr object
-        const zGroup = await openGroup(new HTTPStore( index.mediaURL )); // dataset
+        const zGroup = await openGroup(new HTTPStore( index.current.mediaURL )); // dataset
         const zCenters = await zGroup.getItem("chunk_centers"); // chunk centers array
         const seeds = await zCenters.get([null, null]); // chunk centers data
         setSource(zGroup); // store zarr group for later access (during streaming)
@@ -214,10 +253,8 @@ const PointStream = ({ index }) => {
 
         // get zarr attributes (these contain important metadata)
         const attributes = await zGroup.attrs.asObject();
-        //attributes.stylesheet.illu[0] = 6;
         setAttrs(attributes); // store these for later :-)
         setActiveStyle(attributes.styles[0]);
-        //console.log(attributes);
         
         // initialise arrays that will hold our dense points
         setPoints(new NestedArray(null, [attributes.total,seeds.shape[1]],'<f4'));
@@ -230,20 +267,20 @@ const PointStream = ({ index }) => {
         const bbox = geometry.boundingBox;
         
         // add seed points element
-        if (seedPoints.current) { scene.remove(seedPoints.current); }
+        if (seedPoints.current) { scene.current.remove(seedPoints.current); }
         const material = new THREE.PointsMaterial({
           size: 2, vertexColors: false, sizeAttenuation: true });
         const points = new THREE.Points(geometry, material);
-        scene.add(points);
+        scene.current.add(points);
         seedPoints.current = points;
     
         // Adjust Camera
         const site = params.site;
         let center = new THREE.Vector3();
         let pos;
-        if (site in index.sites){
-          center = new THREE.Vector3(...index.sites[site].tgt);
-          pos = index.sites[site].pos
+        if (site in index.current.sites){
+          center = new THREE.Vector3(...index.current.sites[site].tgt);
+          pos = index.current.sites[site].pos
         } else {
           bbox.getCenter(center);
           const size = bbox.getSize(new THREE.Vector3()).length();
@@ -259,8 +296,7 @@ const PointStream = ({ index }) => {
       } catch (error) {console.error("Error loading Zarr dataset:", error);}
     }
     loadZarr();
-
-  }, [renderer, cameraRef, scene])
+  }, [])
 
   // **Lazy Loading Closest Chunk**
   useEffect(() => {
@@ -313,7 +349,7 @@ const PointStream = ({ index }) => {
         
         const cloud = new THREE.Points(geometry, material);
         colourise( cloud, points, attrs.stylesheet, activeStyle, streamCount); // set colours
-        scene.add(cloud);
+        scene.current.add(cloud);
         densePoints.current = cloud;
       } else {
         // update existing point cloud (add new points)
@@ -336,39 +372,76 @@ const PointStream = ({ index }) => {
     loadClosestChunk();
   }, [seeds, points, streamCount]);
 
-  // **Function to Draw a Line Between Two Points**
-  const drawLine = (point1, point2) => {
-    if (lineRef.current) scene.remove(lineRef.current); // Remove old line if exists
+  // ** Draw annotations **
+  useEffect(()=>{
+    // clear annotations
+    [spheresRef, lineRef, planeRef].forEach( (ref)=>{
+      ref.current.forEach((obj) => {
+        scene.current.remove(obj);
+        obj.geometry.dispose();
+        obj.material.dispose();
+    })});
 
-    const material = new THREE.LineBasicMaterial({ color: 0xffff00 });
-    const geometry = new THREE.BufferGeometry().setFromPoints([point1, point2]);
-    const line = new THREE.Line(geometry, material);
-    scene.add(line);
-    lineRef.current = line;
+    spheresRef.current = [];
+    
+    // Add a yellow sphere to highlight selected points
+    if (attrs){
+      const size = attrs.resolution || 0.1; // Default to 0.1 if missing
+      const sphereGeometry = new THREE.SphereGeometry(size*6, 16, 16);
+      selection.forEach((point)=>{
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        sphere.position.copy(point);
+        scene.current.add(sphere);
+        spheresRef.current.push(sphere);
+      });
+    }
+
+    // add current line, plane or polyline
+    if (selection.length === 2) {
+      drawLine([selection[0], selection[1]]);
+    } else if (selection.length === 3) {
+      drawPlane(selection[0], selection[1], selection[2]);
+    } else if (selection.length > 3){
+      drawLine(selection);
+    }
+
+    // add annotation lines / planes / polylines
+    annotations.lines.forEach( (l) => { drawLine(l.verts) } );
+    annotations.planes.forEach( (l) => { drawPlane(l.verts[0], l.verts[1], l.verts[2]) } );
+    annotations.traces.forEach( (l) => { drawLine(l.verts) } );
+  }, [selection, attrs, annotations]);
+
+  // **Function to Draw a Line Between Two Points**
+  const drawLine = (points) => {
+    if (lineRef.current) scene.current.remove(lineRef.current); // Remove old line if exists
+    const geometry = new LineGeometry();//.setFromPoints([point1, point2]);
+    const v = [];
+    points.forEach( (p) => {v.push(p.x);v.push(p.y);v.push(p.z);} );
+		geometry.setPositions(v);
+    const line = new Line2(geometry, lineMaterial);
+    scene.current.add(line);
+    lineRef.current.push(line);
   };
   
   // **Function to Draw a Plane Defined by Three Points**
   const drawPlane = (point1, point2, point3) => {
-    if (planeRef.current) scene.remove(planeRef.current); // Remove old plane if exists
-
-    const geometry = new THREE.PlaneGeometry(10, 10);
+    // compute plane orientation
+    if (planeRef.current) scene.current.remove(planeRef.current); // Remove old plane if exists
     const material = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
-
-    // Compute normal for plane orientation
-    const normal = new THREE.Vector3();
+    const normal = new THREE.Vector3(); // Compute normal for plane orientation
     const v1 = new THREE.Vector3().subVectors(point2, point1);
     const v2 = new THREE.Vector3().subVectors(point3, point1);
     normal.crossVectors(v1, v2).normalize();
-
-    // Set plane orientation
-    const plane = new THREE.Mesh(geometry, material);
-    plane.position.copy(point1);
+    
+    // add disk
+    const geometry = new THREE.CircleGeometry( Math.max(v1.length(), v2.length())/2, 32 ); 
+    const plane = new THREE.Mesh(geometry, material); // Set plane orientation
+    plane.position.copy(new THREE.Vector3().addVectors(point1, point2).add(point3).divideScalar(3));
     const quaternion = new THREE.Quaternion();
     quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     plane.setRotationFromQuaternion(quaternion);
-
-    scene.add(plane);
-    planeRef.current = plane;
+    scene.current.add(plane);
+    planeRef.current.push(plane);
   };
 
   let buttons = <></>

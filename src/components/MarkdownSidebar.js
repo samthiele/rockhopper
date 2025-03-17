@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm'
 import './MarkdownSidebar.css';
 
 // fetch and MD file for display
@@ -24,7 +25,8 @@ const scrollToHeading = (id) => {
   }
 };
 
-const MarkdownSidebar = ({index}) => {
+const MarkdownSidebar = ({index, annotations, setAnnotations,
+                          scene, renderer, cameraRef, controlsRef}) => {
   const [activeTab, setActiveTab] = useState('Guide'); // visible tab
   const [activeLanguage, setLanguage] = useState(0); // active language
   const [markdown, setMarkdown] = useState(null); // loaded .md files
@@ -37,10 +39,10 @@ const MarkdownSidebar = ({index}) => {
   // load md files
   useEffect(() => {
     async function loadMD(){
-      const guide = await fetchMarkdown( index.guide[activeLanguage] );
-      const notes = await fetchMarkdown( index.notes[activeLanguage] );
-      const extras = await fetchMarkdown( index.extras[activeLanguage] );
-      const help = await fetchMarkdown( index.help[activeLanguage] );
+      const guide = await fetchMarkdown( index.current.guide[activeLanguage] );
+      const notes = await fetchMarkdown( index.current.notes[activeLanguage] );
+      const extras = await fetchMarkdown( index.current.extras[activeLanguage] );
+      const help = await fetchMarkdown( index.current.help[activeLanguage] );
       setMarkdown( { "guide" : guide, "notes" : notes, 
                      "extras" : extras, "help" : help} ) // update MD
       if (activeTab==='Guide') setContent(guide);
@@ -59,10 +61,18 @@ const MarkdownSidebar = ({index}) => {
       }
     }, [content]);
 
+    // Update markdown based on annotations
+    useEffect( () => {
+      // TODO 
+      // console.log(annotations);
+    }, [annotations]);
+
     // edit functions
     const handleDoubleClick = () => {
-      setEditedContent(content);
-      setIsEditing(true);
+      if (!isEditing){
+        setEditedContent(content);
+        setIsEditing(true);
+      }
     };
     const handleKeyDown = (event) => {
       if (event.shiftKey && event.key === 'Enter') {
@@ -70,7 +80,6 @@ const MarkdownSidebar = ({index}) => {
         setIsEditing(false);
       }
     };
-
     
   if (window.location.hash) {
     const id = window.location.hash.substring(1);
@@ -100,63 +109,68 @@ const MarkdownSidebar = ({index}) => {
 
       <div className="content" ref={markdownRef} onDoubleClick={handleDoubleClick}>
       {isEditing ? (
-          <textarea className="markdown"
+          <textarea className="markdown-editor"
             ref={textareaRef}
             value={editedContent}
             onChange={(e) => setEditedContent(e.target.value)}
             onKeyDown={handleKeyDown}
             autoFocus
           /> ) : ( <>
-          <ReactMarkdown className="markdown"
-          components={{
-            h2: ({ node, children }) => {
-              // set ID to allow scrolling to heading
-              if (children.type === 'a'){
-                let id = children.props.children.toLowerCase().replace(/\s+/g, '');
-                if (id in index.siteIndex) id = index.siteIndex[id]; // translate possibly
-                const url = children.props.href;
-                return <h2 id={id}><a href={url}>{children}</a></h2>;
-              } else {
-                let id = children.toLowerCase().replace(/\s+/g, '');
-                if (id in index.siteIndex) id = index.siteIndex[id]; // translate possibly
-                return <h2 id={id}>{children}</h2>;
+          <ReactMarkdown 
+            className="markdown"
+            remarkPlugins={[remarkGfm]}
+            components={{
+              h2: ({ node, children }) => {
+                // set ID to allow scrolling to heading
+                if (children.type === 'a'){
+                  let id = children.props.children.toLowerCase().replace(/\s+/g, '');
+                  if (id in index.current.siteIndex) id = index.current.siteIndex[id]; // translate possibly
+                  const url = children.props.href;
+                  return <h2 id={id}><a href={url}>{children}</a></h2>;
+                } else {
+                  let id = children.toLowerCase().replace(/\s+/g, '');
+                  if (id in index.current.siteIndex) id = index.current.siteIndex[id]; // translate possibly
+                  return <h2 id={id}>{children}</h2>;
+                }
+              },
+              h3: ({ node, children }) => {
+                // set ID to allow scrolling to heading
+                if (children.type === 'a'){
+                  const id = children.props.children.toLowerCase().replace(/\s+/g, '');
+                  const url = children.props.href;
+                  return <h3 id={id}><a href={url}>{children}</a></h3>;
+                } else {
+                  const id = children.toLowerCase().replace(/\s+/g, '');
+                  return <h3 id={id}>{children}</h3>;
+                }
+              },
+              img : ({node, children } ) => {
+                return (
+                  <figure>
+                    <img src={node.properties.src} width="100%" />
+                    <figcaption><em>{node.properties.alt}</em></figcaption>
+                  </figure>
+                  );
               }
-            },
-            h3: ({ node, children }) => {
-              // set ID to allow scrolling to heading
-              if (children.type === 'a'){
-                const id = children.props.children.toLowerCase().replace(/\s+/g, '');
-                const url = children.props.href;
-                return <h3 id={id}><a href={url}>{children}</a></h3>;
-              } else {
-                const id = children.toLowerCase().replace(/\s+/g, '');
-                return <h3 id={id}>{children}</h3>;
-              }
-            },
-            img : ({node, children } ) => {
-              return (
-                <figure>
-                  <img src={node.properties.src} width="100%" />
-                  <figcaption><em>{node.properties.alt}</em></figcaption>
-                </figure>
-                );
-            }
-          }} 
+            }} 
         >
           {content}
         </ReactMarkdown></>)}
       </div>
       <hr/>
       <div className="lbar">
-        {Object.entries(index.languages).map(([i,v]) => {
+        {Object.entries(index.current.languages).map(([i,v]) => {
           return <button className={`lbutton ${activeLanguage==i?'active':''}`}
                          onClick={() => {setLanguage(i)}}
                          key={i}> {v} </button>
         })}
+        <hr width="1" size="100px" />
         <button className="lbutton" 
-                onClick={() => {console.log("todo")}}>Download Markdown</button>
+                onClick={() => {console.log("todo")}}>Add Stop</button>
         <button className="lbutton" 
-                onClick={() => {console.log("todo")}}>Download Pointcloud</button>
+                onClick={() => {console.log("todo")}}>⬇ Markdown</button>
+        <button className="lbutton" 
+                onClick={() => {console.log("todo")}}>⬇ Pointcloud</button>
       </div>
     </div>
   );
