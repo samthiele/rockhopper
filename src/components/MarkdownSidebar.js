@@ -29,8 +29,11 @@ const MarkdownSidebar = ({index}) => {
   const [activeLanguage, setLanguage] = useState(0); // active language
   const [markdown, setMarkdown] = useState(null); // loaded .md files
   const [content, setContent] = useState(''); // md content to draw
+  const [editedContent, setEditedContent] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
   const markdownRef = useRef(null);
-
+  const textareaRef = useRef(null);
+  
   // load md files
   useEffect(() => {
     async function loadMD(){
@@ -56,6 +59,19 @@ const MarkdownSidebar = ({index}) => {
       }
     }, [content]);
 
+    // edit functions
+    const handleDoubleClick = () => {
+      setEditedContent(content);
+      setIsEditing(true);
+    };
+    const handleKeyDown = (event) => {
+      if (event.shiftKey && event.key === 'Enter') {
+        setContent(editedContent);
+        setIsEditing(false);
+      }
+    };
+
+    
   if (window.location.hash) {
     const id = window.location.hash.substring(1);
     scrollToHeading(id);
@@ -82,8 +98,16 @@ const MarkdownSidebar = ({index}) => {
         > Help </button>
       </div>
 
-      <div className="content" ref={markdownRef}>
-        <ReactMarkdown className="markdown"
+      <div className="content" ref={markdownRef} onDoubleClick={handleDoubleClick}>
+      {isEditing ? (
+          <textarea className="markdown"
+            ref={textareaRef}
+            value={editedContent}
+            onChange={(e) => setEditedContent(e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoFocus
+          /> ) : ( <>
+          <ReactMarkdown className="markdown"
           components={{
             h2: ({ node, children }) => {
               // set ID to allow scrolling to heading
@@ -120,14 +144,19 @@ const MarkdownSidebar = ({index}) => {
           }} 
         >
           {content}
-        </ReactMarkdown>
+        </ReactMarkdown></>)}
       </div>
+      <hr/>
       <div className="lbar">
         {Object.entries(index.languages).map(([i,v]) => {
           return <button className={`lbutton ${activeLanguage==i?'active':''}`}
                          onClick={() => {setLanguage(i)}}
                          key={i}> {v} </button>
         })}
+        <button className="lbutton" 
+                onClick={() => {console.log("todo")}}>Download Markdown</button>
+        <button className="lbutton" 
+                onClick={() => {console.log("todo")}}>Download Pointcloud</button>
       </div>
     </div>
   );
