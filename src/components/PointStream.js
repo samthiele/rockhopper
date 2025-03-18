@@ -134,6 +134,10 @@ const PointStream = ({ index, annotations, setAnnotations,
     if (!controlsRef || !cameraRef) return;
     const site = params.site;
     if (site in index.current.sites){
+      if (attrs && densePoints.current && points){
+        colourise(densePoints.current, points, attrs.stylesheet, index.current.sites[site].style);
+      }
+      setActiveStyle(index.current.sites[site].style);
       const center = new THREE.Vector3(...index.current.sites[site].tgt);
       cameraRef.current.position.set(...index.current.sites[site].pos);
       cameraRef.current.lookAt(center);
@@ -171,10 +175,28 @@ const PointStream = ({ index, annotations, setAnnotations,
 
     const handleDoubleClick = (event) => {
       const intersects = getIntersects(event);
+
       if (intersects.length > 0) {
+        const selectedObject = intersects[0].object; // clicked object
         const selectedPoint = intersects[0].point;
-        controlsRef.current.target.copy(selectedPoint);
-        controlsRef.current.update();
+        // set center of rotation
+        if (seedPoints.current && (seedPoints.current === selectedObject)) {
+          controlsRef.current.target.copy(selectedPoint);
+          controlsRef.current.update();
+        } else if (densePoints.current && (densePoints.current === selectedObject)) {
+          controlsRef.current.target.copy(selectedPoint);
+          controlsRef.current.update();
+        } else {
+          // remove clicked element from annotations array (based on position)
+          if (selectedObject.userData.annot){
+            ['lines','planes','traces'].forEach( (n) => {
+              annotations[n]=annotations[n].filter( (l) => {
+                return !l.verts[0].equals(selectedObject.userData.annot.verts[0]);
+              });
+            } );
+            setAnnotations({...annotations}); // N.B. this then triggers a redraw that removes the annotation from the scene :-) 
+          }
+        }
       }
     };
     // keydown events
@@ -187,11 +209,15 @@ const PointStream = ({ index, annotations, setAnnotations,
           const v1 = selection[0];
           const v2 = selection[1];
           const direction = new THREE.Vector3().subVectors(v2, v1).normalize();
-          const trend = (Math.atan2(direction.x, direction.y) * 180) / Math.PI;
-          const plunge = (Math.asin(direction.z) * 180) / Math.PI;
+          let trend = (Math.atan2(direction.x, direction.y) * 180) / Math.PI;
+          let plunge = (Math.asin(direction.z) * 180) / Math.PI;
+          if (plunge < 0){
+            plunge = -plunge;
+            trend = trend - 180; }
           const distance = v1.distanceTo(v2);
           newAnnot.lines.push({
             verts: [v1, v2],
+            current: true,
             trend: trend < 0 ? trend + 360 : trend,
             plunge,
             length: distance,
@@ -209,6 +235,7 @@ const PointStream = ({ index, annotations, setAnnotations,
           const dipdir = (strike + 90) % 360;
           newAnnot.planes.push({
             verts: [v1, v2, v3],
+            current: true,
             strike,
             dip,
             dipdir,
@@ -220,6 +247,7 @@ const PointStream = ({ index, annotations, setAnnotations,
           }
           newAnnot.traces.push({
             verts: [...selection],
+            current: true,
             length: totalLength,
           });
         }
@@ -398,17 +426,17 @@ const PointStream = ({ index, annotations, setAnnotations,
 
     // add current line, plane or polyline
     if (selection.length === 2) {
-      drawLine([selection[0], selection[1]]);
+      drawLine({verts:[selection[0], selection[1]]});
     } else if (selection.length === 3) {
-      drawPlane(selection[0], selection[1], selection[2]);
+      drawPlane({verts:[selection[0], selection[1], selection[2]]});
     } else if (selection.length > 3){
-      drawLine(selection);
+      drawLine({verts:selection});
     }
 
     // add annotation lines / planes / polylines
-    annotations.lines.forEach( (l) => { drawLine(l.verts) } );
-    annotations.planes.forEach( (l) => { drawPlane(l.verts[0], l.verts[1], l.verts[2]) } );
-    annotations.traces.forEach( (l) => { drawLine(l.verts) } );
+    annotations.lines.forEach( (l) => { if (l.current) { drawLine(l) } } );
+    annotations.planes.forEach( (l) => { if (l.current) { drawPlane(l) } } );
+    annotations.traces.forEach( (l) => { if (l.current) { drawLine(l) } } );
   }, [selection, attrs, annotations]);
 
   // **Function to Draw a Line Between Two Points**
@@ -416,19 +444,21 @@ const PointStream = ({ index, annotations, setAnnotations,
     if (lineRef.current) scene.current.remove(lineRef.current); // Remove old line if exists
     const geometry = new LineGeometry();//.setFromPoints([point1, point2]);
     const v = [];
-    points.forEach( (p) => {v.push(p.x);v.push(p.y);v.push(p.z);} );
+    points.verts.forEach( (p) => {v.push(p.x);v.push(p.y);v.push(p.z);} );
 		geometry.setPositions(v);
     const line = new Line2(geometry, lineMaterial);
+    line.userData = {annot:points};
     scene.current.add(line);
     lineRef.current.push(line);
   };
   
   // **Function to Draw a Plane Defined by Three Points**
-  const drawPlane = (point1, point2, point3) => {
+  const drawPlane = (points) => {
     // compute plane orientation
     if (planeRef.current) scene.current.remove(planeRef.current); // Remove old plane if exists
     const material = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
     const normal = new THREE.Vector3(); // Compute normal for plane orientation
+    const [point1, point2, point3] = points.verts;
     const v1 = new THREE.Vector3().subVectors(point2, point1);
     const v2 = new THREE.Vector3().subVectors(point3, point1);
     normal.crossVectors(v1, v2).normalize();
@@ -440,6 +470,7 @@ const PointStream = ({ index, annotations, setAnnotations,
     const quaternion = new THREE.Quaternion();
     quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     plane.setRotationFromQuaternion(quaternion);
+    plane.userData = {annot:points}; // needed to flag when objects are deleted
     scene.current.add(plane);
     planeRef.current.push(plane);
   };

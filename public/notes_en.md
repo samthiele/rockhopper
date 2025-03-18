@@ -2,11 +2,10 @@
 
 - Use this space to jot down notes.
 - Document your observations and findings.
-- Save and load your findings.
-- Useful for use in e.g., class activities or assignments.
+- Record e.g., class activities or assignments.
 
-Type your **markdown** here...
+Double click to edit and enter your thoughts (in markdown). Use `shift+enter` to finish editing.
 
-| Header 1 | Header 2 |
-|----------|----------|
-| Data 1   | Data 2   |
+Any annotations[^1] you take will also appear in tables here. 
+
+[^1]: Use `shift+left-click` to add annotation points. Two points define a line (trend, plunge and distance) while three define a plane (strike, dip, dipdir). More than this defines a polyline or trace. Once finished, use `Enter` to save the annotation and add it to the table (or `Esc` to cancel)

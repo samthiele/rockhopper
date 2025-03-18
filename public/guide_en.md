@@ -3,17 +3,37 @@
 - Include general information first.
 - Then describe detailed stops.
 
-The text in this section can be relatively long and detailed, and contain pictures or other markdown-compatable formatting. A useful guide to writing markdown files can be found [here](https://www.markdownguide.org/cheat-sheet/).
+This content is stored as readily editable markdown (.md) files. A useful guide to writing markdown files can be found [here](https://www.markdownguide.org/cheat-sheet/).
+
+To edit the markdown in your browser, double-click this text. Once finished,
+use `shift+enter` to render the markdown again.
+
+Note that edited markdown is NOT saved unless you download it using the button below.
+
+## Getting fancy
+
+The text in this section can be relatively long and detailed, and contain pictures or other markdown-compatable formatting.
 
 ![Don't let markdown get you down!](https://upload.wikimedia.org/wikipedia/commons/7/7b/ZSL_London_-_Northern_rockhopper_penguin_%2801%29.jpg)
 
-Note that the hash part of the URL can be used to link to specific headings (defined using # or ##) in this markdown file. You can see this in action by clicking [here](/#site2) or [here](/#guide). If these sites area also registered
-in the `index.json` file, then corresponding changes in the viewer (camera position, render style, point visibility etc.) will be updated and any defined site audio triggered. Note that these links are possibly language specific!
+Tables are also possible, if needed:
 
-It's generally assumed that each "stop" associated with each part of a virtual field trip will contain a corresponding heading.
+| Header 1 | Header 2 |
+|----------|----------|
+| Data 1   | Data 2   |
+
+## Linking to headings and sites
+
+The hash part of the URL can be used to create links in the markdown to specific headings in this markdown file (defined using # or ##). You can see this in action by clicking [here](/#site2) or [here](/#guide).
+
+If these sites area also registered in the `index.json` file, then corresponding changes in the viewer (camera position, render style, point visibility etc.) will be updated, and any defined site audio triggered.
+
+It's assumed (though not essential) that each "site" associated with a virtual field trip will contain a corresponding heading. An example of this can be seen below.
 
 ## [Site 1](/#site1)
-- How cool is this place! Look what we can see?
+
+- Clicking on the link above will zoom directly too it in the dataset, so we can 
+  explore ourselves and see what is going on.
 - I found a nice rock - check it out!
 
 ![My funky rock collection](https://upload.wikimedia.org/wikipedia/commons/4/41/Pet_rock.jpg)
@@ -21,5 +41,5 @@ It's generally assumed that each "stop" associated with each part of a virtual f
 ## [Site 2](/#site2)
 
 - This is another location that we want to explore in this dataset.
-- Clicking on the link above will zoom directly too it in the dataset, so we can 
-  explore ourselves and see what is going on.
+- How cool is this place! Look what we can see?
+

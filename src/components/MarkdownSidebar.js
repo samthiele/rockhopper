@@ -17,6 +17,40 @@ const fetchMarkdown = async (url) => {
   }
 };
 
+const annotToMD = (annotations) => {
+  let text = "\n";
+  const bearing = {minimumIntegerDigits:3, useGrouping:false, maximumFractionDigits:0};
+  const dip = {minimumIntegerDigits:2, useGrouping:false, maximumFractionDigits:0};
+  const length = {useGrouping:false, maximumFractionDigits:2};
+  if (annotations.planes.length > 0){
+    text = text + "## Planes\n";
+    text = text + " | strike | dip | dipdir | \n";
+    text = text + " |--------|-----|--------| \n";
+    annotations.planes.forEach( (p) => {
+      if (p.current) {
+        text = text + '|'+p.strike.toLocaleString('en-US', bearing);
+        text = text + '|'+p.dip.toLocaleString('en-US', bearing);
+        text = text + '|'+p.dipdir.toLocaleString('en-US', bearing);
+        text = text + '|\n';
+      }
+    });
+  }
+  if (annotations.lines.length > 0){
+    text = text + "## Lines\n";
+    text = text + " | trend | plunge | length | \n";
+    text = text + " |-------|--------|--------| \n";
+    annotations.lines.forEach( (l) => {
+      if (l.current) {
+        text = text + '|'+l.trend.toLocaleString('en-US', bearing);
+        text = text + '|'+l.plunge.toLocaleString('en-US', dip);
+        text = text + '|'+l.length.toLocaleString('en-US', length);
+        text = text + ' |\n';
+      }
+    });
+  }
+  return text;
+};
+
 // Scroll MD to a specific heading
 const scrollToHeading = (id) => {
   const element = document.getElementById(id);
@@ -60,12 +94,6 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
         setTimeout(() => scrollToHeading(id), 50); // Delay to ensure content is loaded
       }
     }, [content]);
-
-    // Update markdown based on annotations
-    useEffect( () => {
-      // TODO 
-      // console.log(annotations);
-    }, [annotations]);
 
     // edit functions
     const handleDoubleClick = () => {
@@ -154,7 +182,7 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
               }
             }} 
         >
-          {content}
+          {content + ((activeTab==='Notebook')?annotToMD(annotations):"")}
         </ReactMarkdown></>)}
       </div>
       <hr/>
