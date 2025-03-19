@@ -11,7 +11,6 @@ import './PointStream.css';
 
 const LOAD_INTERVAL = 100; // ms to sleep between loading new chunks
 const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-const lineMaterial = new LineMaterial({ color: 0xffff00, linewidth: 5, vertexColors: false });
 
 // recompute a point cloud colour array from the source
 // (typically using a different visualisation style)
@@ -74,6 +73,7 @@ const PointStream = ({ index, annotations, setAnnotations,
   const [currentScene, setCurrentScene] = useState('start');
 
   // annotation states
+  const [annotColor, setAnnotColor] = useState('#ffcd00'); // 0xffff00
   const [selection, setSelection] = useState([]);
   const spheresRef = useRef([]); // Stores annotation spheres
   const lineRef = useRef([]); // Stores annotation lines
@@ -220,7 +220,7 @@ const PointStream = ({ index, annotations, setAnnotations,
           const distance = v1.distanceTo(v2);
           newAnnot.lines.push({
             verts: [v1, v2],
-            current: true,
+            color: annotColor,
             trend: trend < 0 ? trend + 360 : trend,
             plunge,
             length: distance,
@@ -238,7 +238,7 @@ const PointStream = ({ index, annotations, setAnnotations,
           const dipdir = (strike + 90) % 360;
           newAnnot.planes.push({
             verts: [v1, v2, v3],
-            current: true,
+            color: annotColor,
             strike,
             dip,
             dipdir,
@@ -250,7 +250,7 @@ const PointStream = ({ index, annotations, setAnnotations,
           }
           newAnnot.traces.push({
             verts: [...selection],
-            current: true,
+            color: annotColor,
             length: totalLength,
           });
         }
@@ -418,7 +418,7 @@ const PointStream = ({ index, annotations, setAnnotations,
     // Add a yellow sphere to highlight selected points
     if (attrs){
       const size = attrs.resolution || 0.1; // Default to 0.1 if missing
-      const sphereGeometry = new THREE.SphereGeometry(size*6, 16, 16);
+      const sphereGeometry = new THREE.SphereGeometry(size*3, 16, 16);
       selection.forEach((point)=>{
         const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
         sphere.position.copy(point);
@@ -429,18 +429,18 @@ const PointStream = ({ index, annotations, setAnnotations,
 
     // add current line, plane or polyline
     if (selection.length === 2) {
-      drawLine({verts:[selection[0], selection[1]]});
+      drawLine({verts:[selection[0], selection[1]], color:annotColor});
     } else if (selection.length === 3) {
-      drawPlane({verts:[selection[0], selection[1], selection[2]]});
+      drawPlane({verts:[selection[0], selection[1], selection[2]], color:annotColor});
     } else if (selection.length > 3){
-      drawLine({verts:selection});
+      drawLine({verts:selection, color:annotColor});
     }
 
     // add annotation lines / planes / polylines
-    annotations.lines.forEach( (l) => { if (l.current) { drawLine(l) } } );
-    annotations.planes.forEach( (l) => { if (l.current) { drawPlane(l) } } );
-    annotations.traces.forEach( (l) => { if (l.current) { drawLine(l) } } );
-  }, [selection, attrs, annotations]);
+    annotations.lines.forEach( (l) => { drawLine(l) } );
+    annotations.planes.forEach( (l) => { drawPlane(l) } );
+    annotations.traces.forEach( (l) => { drawLine(l) } );
+  }, [selection, attrs, annotations, annotColor]);
 
   // **Function to Draw a Line Between Two Points**
   const drawLine = (points) => {
@@ -449,6 +449,8 @@ const PointStream = ({ index, annotations, setAnnotations,
     const v = [];
     points.verts.forEach( (p) => {v.push(p.x);v.push(p.y);v.push(p.z);} );
 		geometry.setPositions(v);
+    const colour = points.color ? points.color : 0xffff00;
+    const lineMaterial = new LineMaterial({ color: colour, linewidth: 5, vertexColors: false });
     const line = new Line2(geometry, lineMaterial);
     line.userData = {annot:points};
     scene.current.add(line);
@@ -459,7 +461,8 @@ const PointStream = ({ index, annotations, setAnnotations,
   const drawPlane = (points) => {
     // compute plane orientation
     if (planeRef.current) scene.current.remove(planeRef.current); // Remove old plane if exists
-    const material = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+    const colour = points.color ? points.color : 0xffff00;
+    const material = new THREE.MeshBasicMaterial({ color: colour, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
     const normal = new THREE.Vector3(); // Compute normal for plane orientation
     const [point1, point2, point3] = points.verts;
     const v1 = new THREE.Vector3().subVectors(point2, point1);
@@ -487,6 +490,13 @@ const PointStream = ({ index, annotations, setAnnotations,
                       colourise(densePoints.current, points, attrs.stylesheet, k); }}
       key={k}> {k} </button>
     });
+    buttons.push(<input
+      type="color"
+      value={annotColor}
+      onChange={(e)=>{setAnnotColor(e.target.value)}}
+      style={{ width: '36px', height: '26px',
+        border: 'none', padding: '0', background: 'none', cursor: 'pointer' }}
+    />);
   }
 
   //attributes

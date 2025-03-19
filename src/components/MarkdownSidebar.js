@@ -27,12 +27,10 @@ const annotToMD = (annotations) => {
     text = text + " | strike | dip | dipdir | \n";
     text = text + " |--------|-----|--------| \n";
     annotations.planes.forEach( (p) => {
-      if (p.current) {
-        text = text + '|'+p.strike.toLocaleString('en-US', bearing);
-        text = text + '|'+p.dip.toLocaleString('en-US', bearing);
-        text = text + '|'+p.dipdir.toLocaleString('en-US', bearing);
-        text = text + '|\n';
-      }
+    text = text + '|'+p.strike.toLocaleString('en-US', bearing);
+    text = text + '|'+p.dip.toLocaleString('en-US', bearing);
+    text = text + '|'+p.dipdir.toLocaleString('en-US', bearing);
+    text = text + '|\n';
     });
   }
   if (annotations.lines.length > 0){
@@ -40,12 +38,10 @@ const annotToMD = (annotations) => {
     text = text + " | trend | plunge | length | \n";
     text = text + " |-------|--------|--------| \n";
     annotations.lines.forEach( (l) => {
-      if (l.current) {
         text = text + '|'+l.trend.toLocaleString('en-US', bearing);
         text = text + '|'+l.plunge.toLocaleString('en-US', dip);
         text = text + '|'+l.length.toLocaleString('en-US', length);
         text = text + ' |\n';
-      }
     });
   }
   return text;
@@ -196,6 +192,13 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
                   }
                 }
                 return <li>{children}</li>;
+              },
+              blockquote : ({node, children}) => {
+                // todo -- implement "custom" markdown components here!
+                // (e.g., stereonets)
+                const command = children[1].props.children;
+                console.log(command);
+                return <blockquote>{children}</blockquote>
               }
             }} 
         >
