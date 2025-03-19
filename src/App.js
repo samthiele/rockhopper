@@ -9,7 +9,8 @@ const App = () => {
   // load index json file
   const [loading, setLoading] = useState(true);
   const [annotations, setAnnotations] = useState({lines:[], planes:[], traces:[]});
-  const index = useRef(null);
+  
+  const index = useRef(null); 
   const scene = useRef(null); // three.js scene
   const renderer = useRef(null); // three.js renderer 
   const cameraRef = useRef(null); // camera object 
@@ -23,7 +24,12 @@ const App = () => {
       .then(response => response.json())
       .then(data => {
         index.current = data;
-        //setIndex(data);
+        
+        // add site names to synonyms
+        Object.keys( index.current.sites ).forEach( (k) => {
+          index.current.synonyms[k] = k; // makes for easier lookups
+        })
+
         setLoading(false);
         console.log(data);
       })
@@ -50,7 +56,8 @@ const App = () => {
                                                 renderer={renderer}
                                                 cameraRef={cameraRef}
                                                 controlsRef={controlsRef}
-                                                activeStyle={activeStyle}/>]} 
+                                                activeStyle={activeStyle}
+                                                key={"md"}/>]} 
                        right={[<PointStream index={index} 
                                             annotations={annotations} 
                                             setAnnotations={setAnnotations}
@@ -59,7 +66,8 @@ const App = () => {
                                             cameraRef={cameraRef}
                                             controlsRef={controlsRef}
                                             activeStyle={activeStyle}
-                                            setActiveStyle={setActiveStyle}/>]} 
+                                            setActiveStyle={setActiveStyle}
+                                            key={"ps"}/>]} 
                        split="40"/> 
            </div>
           }/>

@@ -1,19 +1,24 @@
 {
     "languages": [ "en", "de" ],
-    "guide": [ "guide_en.md", "guide_de.md" ],
-    "notes": [ "notes_en.md", "notes_de.md" ],
-    "extras": [ "extras_en.md", "extras_de.md" ],
-    "help": [ "help_en.md","help_de.md"],
-
-    "mediaType": "type",
-    "mediaURL": "https://storage.googleapis.com/rockhopper/test.zarr",
-
-    "siteIndex" : {
+    "tabs":{ "Notebook":[ "notes_en.md", "notes_de.md" ],
+             "Help":[ "help_en.md","help_de.md"]},
+    "sites":{
+        "site1":{
+            "tabs":{"Guide":[ "site1-2/guide_en.md", "site1-2/guide_de.md" ]},
+            "mediaType": "cloud",
+            "mediaURL": "https://storage.googleapis.com/rockhopper/test.zarr",
+            "view":{"pos":[133, -3, 3], "tgt":[77, 50, -28], "style" : "rgb"}
+        },
+        "site2":{
+            "tabs":{"Guide":[ "site1-2/guide_en.md", "site1-2/guide_de.md" ]},
+            "mediaType": "cloud",
+            "mediaURL": "https://storage.googleapis.com/rockhopper/test.zarr",
+            "view":{"pos":[-53, -127, 45], "tgt":[-91, -81, 24], "style":"illu"}
+        }
+    },
+    "synonyms" : {
+        "start":"site1",
         "standort1" : "site1",
         "standort2" : "site2"
-    },
-    "sites" : {
-        "site1" : {"pos":[133, -3, 3], "tgt":[77, 50, -28], "style" : "rgb"},
-        "site2" : {"pos":[-53, -127, 45], "tgt":[-91, -81, 24], "style":"illu"}
     }
 }

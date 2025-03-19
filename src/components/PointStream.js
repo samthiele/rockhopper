@@ -11,6 +11,7 @@ import './PointStream.css';
 
 const LOAD_INTERVAL = 100; // ms to sleep between loading new chunks
 const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+const nostream = false; // quickly disable streaming (for dev purposes)
 
 // recompute a point cloud colour array from the source
 // (typically using a different visualisation style)
@@ -69,8 +70,10 @@ const PointStream = ({ index, annotations, setAnnotations,
   const [seeds, setSeeds] = useState(null); // seed points to load chunks
   const [points, setPoints] = useState(null); // streamed point array
   const [streamed, setStreamed] = useState({}); // track which chunks have been loaded
+  
   const [streamCount, setStreamCount] = useState(0); // number of points already streamed
-  const [currentScene, setCurrentScene] = useState('start');
+  const [currentSite, setCurrentSite] = useState('start');
+  const [currentMedia, setCurrentMedia] = useState(''); // current media we are connected to
 
   // annotation states
   const [annotColor, setAnnotColor] = useState('#ffcd00'); // 0xffff00
@@ -81,6 +84,7 @@ const PointStream = ({ index, annotations, setAnnotations,
 
   // Setup three.js scene, renderer, camera and view controls
   useEffect(() => {
+    if (nostream){ return };
     const mount = mountRef.current;
     const width = mount.clientWidth;
     const height = mount.clientHeight;
@@ -131,29 +135,30 @@ const PointStream = ({ index, annotations, setAnnotations,
   
   // handle site from URL
   const params = useParams();
+  const site = index.current.synonyms[currentSite];
   useEffect(()=>{
-    if (!controlsRef || !cameraRef) return; //nothing to do here
-    if (params.site === currentScene) return; //nothing to do here
-    const site = params.site;
+    if (!controlsRef || !cameraRef || nostream) return; //nothing to do here
+    if (params.site === currentSite) return; //nothing to do here
+    const site = index.current.synonyms[params.site];
     if (site in index.current.sites){
       if (attrs && densePoints.current && points){
-        colourise(densePoints.current, points, attrs.stylesheet, index.current.sites[site].style);
+        colourise(densePoints.current, points, attrs.stylesheet, index.current.sites[site].view.style);
       }
       setActiveStyle(index.current.sites[site].style);
-      setCurrentScene(params.site); // store that this is the current scene so we don't redraw unecessarily
-      const center = new THREE.Vector3(...index.current.sites[site].tgt);
-      cameraRef.current.position.set(...index.current.sites[site].pos);
+      setCurrentSite(params.site); // store that this is the current scene so we don't redraw unecessarily
+      const center = new THREE.Vector3(...index.current.sites[site].view.tgt);
+      cameraRef.current.position.set(...index.current.sites[site].view.pos);
       cameraRef.current.lookAt(center);
       controlsRef.current.target.copy(center);
       controlsRef.current.update();
     } else if (site === 'downloadPoints'){
       console.log("TODO - download our point cloud as CSV");
     }
-  },[params, currentScene]);
+  },[params, currentSite]);
 
   // Handle click and key events
   useEffect(() => {
-    if (!renderer || !cameraRef) return;
+    if (!renderer || !cameraRef || nostream) return;
 
     const getIntersects = ( event ) => {
       const rect = renderer.current.domElement.getBoundingClientRect();
@@ -272,11 +277,14 @@ const PointStream = ({ index, annotations, setAnnotations,
   
   // Load seeds (chunk centers) and draw them
   useEffect(()=> {
-    if (!controlsRef.current || !cameraRef.current) return;
+    if (!controlsRef.current || !cameraRef.current || nostream) return;
+    const url = index.current.sites[ site ].mediaURL;
+    if (url === currentMedia) return; // nothing to do here
+    console.log(`Loading cloud from ${url}`);
     async function loadZarr() {
       try {
         // connect to zarr object
-        const zGroup = await openGroup(new HTTPStore( index.current.mediaURL )); // dataset
+        const zGroup = await openGroup(new HTTPStore( url )); // dataset
         const zCenters = await zGroup.getItem("chunk_centers"); // chunk centers array
         const seeds = await zCenters.get([null, null]); // chunk centers data
         setSource(zGroup); // store zarr group for later access (during streaming)
@@ -310,8 +318,8 @@ const PointStream = ({ index, annotations, setAnnotations,
         let center = new THREE.Vector3();
         let pos;
         if (site in index.current.sites){
-          center = new THREE.Vector3(...index.current.sites[site].tgt);
-          pos = index.current.sites[site].pos
+          center = new THREE.Vector3(...index.current.sites[site].view.tgt);
+          pos = index.current.sites[site].view.pos;
         } else {
           bbox.getCenter(center);
           const size = bbox.getSize(new THREE.Vector3()).length();
@@ -327,11 +335,12 @@ const PointStream = ({ index, annotations, setAnnotations,
       } catch (error) {console.error("Error loading Zarr dataset:", error);}
     }
     loadZarr();
+    setCurrentMedia( url );
   }, [])
 
   // **Lazy Loading Closest Chunk**
   useEffect(() => {
-    if (!cameraRef || !seeds || !source || !points) return;
+    if (!cameraRef || !seeds || !source || !points || nostream) return;
 
     const loadClosestChunk = async () => {
       const camPos = new THREE.Vector3();
@@ -405,6 +414,8 @@ const PointStream = ({ index, annotations, setAnnotations,
 
   // ** Draw annotations **
   useEffect(()=>{
+    if (nostream){ return };
+
     // clear annotations
     [spheresRef, lineRef, planeRef].forEach( (ref)=>{
       ref.current.forEach((obj) => {
@@ -492,13 +503,15 @@ const PointStream = ({ index, annotations, setAnnotations,
     });
     buttons.push(<input
       type="color"
+      key="cols"
       value={annotColor}
       onChange={(e)=>{setAnnotColor(e.target.value)}}
       style={{ width: '36px', height: '26px',
         border: 'none', padding: '0', background: 'none', cursor: 'pointer' }}
     />);
   }
-
+  if (nostream) return <div className="viewer" ref={mountRef} style={{ height: "100%", width: "100%" }} />
+  
   //attributes
   return (
     <div style={{ height: "100vh", width: "100vw", position: "relative" }}>
