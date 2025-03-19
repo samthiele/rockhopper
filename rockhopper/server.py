@@ -40,4 +40,4 @@ def fileServer( root, port=3002):
 
 # launch in the current directory
 if __name__ == "__main__":
-    fileServer( '.' )
+    fileServer( '/Users/thiele67/Documents/Python/rockhopper/sandbox' )

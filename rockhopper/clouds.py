@@ -138,7 +138,7 @@ def loadPLY(path):
 
 def exportZA(points, zarr_store_path, 
              chunk_size=200000, resolution=0.1,
-             stylesheet=None, styles=None):
+             stylesheet=None, styles=None, **kwds):
     """
     Convert a NumPy array of shape (N, 6) -> [x, y, z, r, g, b, ...]
     into a Zarr dataset. Also compute a second Zarr dataset
@@ -216,7 +216,8 @@ def exportZA(points, zarr_store_path,
                     "total" : len(points), 
                     "chunks" : len(ixx),
                     "styles" : styles,
-                    "stylesheet" : stylesheet })
+                    "stylesheet" : stylesheet,
+                    **kwds })
 
     # build chunks and add to the zarr object
     centers = []

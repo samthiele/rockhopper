@@ -18,17 +18,16 @@ const nostream = false; // quickly disable streaming (for dev purposes)
 function colourise(cloud, array, settings = null, key = null, offset=0){
   // parse colour mapping settings
   //let value = { 'R': [3, 0, 1], 'G': [4, 0, 1], 'B': [5, 0, 1] }; // default RGB mapping
-  let value = [2, {limits:[-100, 100, 25], scale:'viridis'}]
+  let value = {color:[2, {limits:[-100, 100, 25], scale:'viridis'}]};
   if (settings){
     if (key in settings) {
       value = settings[key];
     }
   }
   const n = cloud.geometry.drawRange.count; // number of points to colour
-  if (Array.isArray(value)) {
+  if (Array.isArray(value.color)) {
       // Case 1: Colour ramp visualisation (scalar mapping)
-      const [index, options] = value;
-      const v = array.get([slice(offset,n), index]);
+      const [index, options] = value.color;
 
       // Compute limits using chroma.limits
       const domain = chroma.limits([options.limits[0],options.limits[1]], 'e', options.limits[2]);
@@ -36,24 +35,61 @@ function colourise(cloud, array, settings = null, key = null, offset=0){
 
       // update cloud colour array
       for (let i = offset; i < n; i++){
-        const color = scale(v.get([i-offset])).rgb();
-        cloud.geometry.attributes.color.array.set(
-          [color[0]/255,color[1]/255,color[2]/255], i*3 );
+        const c = scale(array.get([i, index])).rgb(); // compute colour
+        for (let j = 0; j<3; j++){c[j] = c[j] / 255;} // convert to 0 - 1 range
+        cloud.geometry.attributes.color.array.set( c, i*3 );
       }
   } else {
       // Case 2: Ternary mapping (R, G, B)
-      const r = array.get([slice(offset,n), value['R'][0]]);
-      const g = array.get([slice(offset,n), value['G'][0]]);
-      const b = array.get([slice(offset,n), value['B'][0]]);
-      for (let i = offset; i < n; i++){
+      let [ix0, ix1, ix2, c] = [value.color['R'][0],
+                                value.color['G'][0],
+                                value.color['B'][0],0];
+      for (let i = offset; i < n; i++){ // compute colour or each point
+        const c = [(array.get([i, ix0]) - value.color['R'][1])/(value.color['R'][2] - value.color['R'][1]),
+        (array.get([i, ix1]) - value.color['G'][1])/(value.color['G'][2] - value.color['G'][1]),
+        (array.get([i, ix2]) - value.color['B'][1])/(value.color['B'][2] - value.color['B'][1])]
+        
         // update cloud colour array
-        cloud.geometry.attributes.color.array.set(
-          [(r.get([i-offset]) - value['R'][1])/(value['R'][2] - value['R'][1]),
-           (g.get([i-offset]) - value['G'][1])/(value['G'][2] - value['G'][1]),
-           (b.get([i-offset]) - value['B'][1])/(value['B'][2] - value['B'][1])], i*3 );
+        cloud.geometry.attributes.color.array.set( c, i*3 );
       }
   }
   // flag that updates are needed
+  cloud.geometry.attributes.color.needsUpdate = true;
+}
+
+// define function to highlight points
+const applyHighlight = (cloud, array, highlight, offset=0) => {
+  const n = cloud.geometry.drawRange.count; // number of points to change colour
+  // get highlight settings
+  const [index,iq,thresh] = highlight.iq;
+  const c2 = highlight.color;
+  const f = highlight.blend;
+  const blend = (c1) => {
+    return [
+      c1[0]*(1-f) + c2[0]*f,
+      c1[1]*(1-f) + c2[1]*f,
+      c1[2]*(1-f) + c2[2]*f,
+    ] }
+  
+  // update colours to include the highlight
+  let [r,g,b,v] = [0,0,0,0];
+  for (let i = offset; i < n; i++){
+    r = cloud.geometry.attributes.color.array[i*3];
+    g = cloud.geometry.attributes.color.array[i*3+1];
+    b = cloud.geometry.attributes.color.array[i*3+2];
+    v = array.get([i, index]);
+
+    if (iq === '='){
+      if (v === thresh) [r,g,b] = blend([r,g,b]); // blend colour
+    } else if (iq === '<' ){
+      if (v <= thresh) [r,g,b] = blend([r,g,b]); // blend colour
+    } else if (iq === '>'){
+      if (v >= thresh) [r,g,b] = blend([r,g,b]); // blend colour
+    } else if (iq === '!='){
+      if (v !== thresh) [r,g,b] = blend([r,g,b]); // blend colour
+    }
+    cloud.geometry.attributes.color.array.set( [r,g,b], i*3 );
+  }
   cloud.geometry.attributes.color.needsUpdate = true;
 }
 
@@ -70,7 +106,8 @@ const PointStream = ({ index, annotations, setAnnotations,
   const [seeds, setSeeds] = useState(null); // seed points to load chunks
   const [points, setPoints] = useState(null); // streamed point array
   const [streamed, setStreamed] = useState({}); // track which chunks have been loaded
-  
+  const [highlight, setHighlight] = useState(null); // selected highlights
+  const prevRGB = useRef(null); // used for turning highlight off quickly
   const [streamCount, setStreamCount] = useState(0); // number of points already streamed
   const [currentSite, setCurrentSite] = useState('start');
   const [currentMedia, setCurrentMedia] = useState(''); // current media we are connected to
@@ -142,7 +179,9 @@ const PointStream = ({ index, annotations, setAnnotations,
     const site = index.current.synonyms[params.site];
     if (site in index.current.sites){
       if (attrs && densePoints.current && points){
-        colourise(densePoints.current, points, attrs.stylesheet, index.current.sites[site].view.style);
+        colourise(densePoints.current, points, 
+                  attrs.stylesheet, index.current.sites[site].view.style);
+        prevRGB.current = densePoints.current.geometry.attributes.color.clone();
       }
       setActiveStyle(index.current.sites[site].style);
       setCurrentSite(params.site); // store that this is the current scene so we don't redraw unecessarily
@@ -294,7 +333,8 @@ const PointStream = ({ index, annotations, setAnnotations,
         const attributes = await zGroup.attrs.asObject();
         setAttrs(attributes); // store these for later :-)
         setActiveStyle(attributes.styles[0]);
-        
+        console.log(attributes);
+
         // initialise arrays that will hold our dense points
         setPoints(new NestedArray(null, [attributes.total,seeds.shape[1]],'<f4'));
         
@@ -391,6 +431,7 @@ const PointStream = ({ index, annotations, setAnnotations,
         colourise( cloud, points, attrs.stylesheet, activeStyle, streamCount); // set colours
         scene.current.add(cloud);
         densePoints.current = cloud;
+        prevRGB.current = densePoints.current.geometry.attributes.color.clone(); // store backup of colours in case of highlighting
       } else {
         // update existing point cloud (add new points)
         const p = chunkData.get([null, slice(0,3)]).flatten();
@@ -400,6 +441,7 @@ const PointStream = ({ index, annotations, setAnnotations,
         //densePoints.current.geometry.computeBoundingBox(); // need to update the bbox?
         densePoints.current.geometry.computeBoundingSphere(); // this is needed for picking
         colourise( densePoints.current, points, attrs.stylesheet, activeStyle, streamCount);
+        prevRGB.current = densePoints.current.geometry.attributes.color.clone();
       }
       
       // sleep a bit to not hog resources, then update everything
@@ -493,12 +535,16 @@ const PointStream = ({ index, annotations, setAnnotations,
   };
 
   let buttons = <></>
+  let buttons2 = <></>
   if (attrs){
     buttons = attrs.styles.map((k) => {
       return <button
       className={`button ${activeStyle === k ? 'active' : ''}`}
-      onClick={() => {setActiveStyle(k); 
-                      colourise(densePoints.current, points, attrs.stylesheet, k); }}
+      onClick={() => {
+                      colourise(densePoints.current, points, attrs.stylesheet, k);
+                      prevRGB.current = densePoints.current.geometry.attributes.color.clone();
+                      setActiveStyle(k);  
+                      setHighlight(null); }}
       key={k}> {k} </button>
     });
     buttons.push(<input
@@ -509,6 +555,22 @@ const PointStream = ({ index, annotations, setAnnotations,
       style={{ width: '36px', height: '26px',
         border: 'none', padding: '0', background: 'none', cursor: 'pointer' }}
     />);
+    if (attrs.highlights){
+      buttons2 = Object.keys(attrs.highlights).map((k) => {
+        return <button
+        className={`button ${highlight === k ? 'active' : ''}`}
+        onClick={() => {if (highlight === k){
+                          setHighlight(null);
+                          console.log("clear");
+                          densePoints.current.geometry.attributes.color = prevRGB.current;
+                          densePoints.current.geometry.attributes.color.needsUpdate = true;
+                        } else {
+                          setHighlight(k);
+                          applyHighlight(densePoints.current, points, attrs.highlights[k]); }
+                        }}
+        key={k}> {k} </button>
+      });
+    }
   }
   if (nostream) return <div className="viewer" ref={mountRef} style={{ height: "100%", width: "100%" }} />
   
@@ -518,6 +580,9 @@ const PointStream = ({ index, annotations, setAnnotations,
       <div className="buttons">
         <div className="row">
           { buttons }
+        </div>
+        <div className="row2">
+          { buttons2 }
         </div>
       </div>
       <div className="viewer" ref={mountRef} style={{ height: "100%", width: "100%" }} />

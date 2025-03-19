@@ -6,11 +6,17 @@
         "site1":{
             "tabs":{"Guide":[ "site1-2/guide_en.md", "site1-2/guide_de.md" ]},
             "mediaType": "cloud",
-            "mediaURL": "https://storage.googleapis.com/rockhopper/test.zarr",
+            "mediaURL": "http://127.0.0.1:3002/test.zarr",
             "view":{"pos":[133, -3, 3], "tgt":[77, 50, -28], "style" : "rgb"}
         },
         "site2":{
             "tabs":{"Guide":[ "site1-2/guide_en.md", "site1-2/guide_de.md" ]},
+            "mediaType": "cloud",
+            "mediaURL": "http://127.0.0.1:3002/test.zarr",
+            "view":{"pos":[-53, -127, 45], "tgt":[-91, -81, 24], "style":"illu"}
+        },
+        "site3":{
+            "tabs":{"Guide":[ "site3/guide_en.md", "site3/guide_de.md" ]},
             "mediaType": "cloud",
             "mediaURL": "https://storage.googleapis.com/rockhopper/test.zarr",
             "view":{"pos":[-53, -127, 45], "tgt":[-91, -81, 24], "style":"illu"}
