@@ -71,6 +71,7 @@ const PointStream = ({ index, annotations, setAnnotations,
   const [points, setPoints] = useState(null); // streamed point array
   const [streamed, setStreamed] = useState({}); // track which chunks have been loaded
   const [streamCount, setStreamCount] = useState(0); // number of points already streamed
+  const [currentScene, setCurrentScene] = useState('start');
 
   // annotation states
   const [selection, setSelection] = useState([]);
@@ -131,13 +132,15 @@ const PointStream = ({ index, annotations, setAnnotations,
   // handle site from URL
   const params = useParams();
   useEffect(()=>{
-    if (!controlsRef || !cameraRef) return;
+    if (!controlsRef || !cameraRef) return; //nothing to do here
+    if (params.site === currentScene) return; //nothing to do here
     const site = params.site;
     if (site in index.current.sites){
       if (attrs && densePoints.current && points){
         colourise(densePoints.current, points, attrs.stylesheet, index.current.sites[site].style);
       }
       setActiveStyle(index.current.sites[site].style);
+      setCurrentScene(params.site); // store that this is the current scene so we don't redraw unecessarily
       const center = new THREE.Vector3(...index.current.sites[site].tgt);
       cameraRef.current.position.set(...index.current.sites[site].pos);
       cameraRef.current.lookAt(center);
@@ -146,7 +149,7 @@ const PointStream = ({ index, annotations, setAnnotations,
     } else if (site === 'downloadPoints'){
       console.log("TODO - download our point cloud as CSV");
     }
-  },[params]);
+  },[params, currentScene]);
 
   // Handle click and key events
   useEffect(() => {

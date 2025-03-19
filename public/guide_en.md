@@ -22,6 +22,17 @@ Tables are also possible, if needed:
 |----------|----------|
 | Data 1   | Data 2   |
 
+And, finally, "task lists" have been adapted to let you pose multiple-guess questions!
+
+---
+
+Are penguins punks?
+- [x] Yes
+- [ ] No
+- [ ] Sometimes
+
+---
+
 ## Linking to headings and sites
 
 The hash part of the URL can be used to create links in the markdown to specific headings in this markdown file (defined using # or ##). You can see this in action by clicking [here](/#site2) or [here](/#guide).

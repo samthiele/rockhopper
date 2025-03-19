@@ -173,32 +173,48 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
                 }
               },
               img : ({node, children } ) => {
+                // set size and add alt-text as figure caption
                 return (
                   <figure>
                     <img src={node.properties.src} width="100%" />
                     <figcaption><em>{node.properties.alt}</em></figcaption>
                   </figure>
                   );
+              },
+              li :({node, children}) => {
+                //node.children[0].disabled = false;
+                if (node.children[0].type === 'element'){
+                  if (node.children[0].properties.type === 'checkbox'){
+                    const answer = node.children[0].properties.checked;
+                    return <li class="question">
+                            <input type="checkbox" onClick={(e)=>{
+                              e.target.checked = true;
+                              e.target.className = answer ? "correct" : "incorrect";
+                            }}/>
+                            {children.slice(1)}
+                           </li>
+                  }
+                }
+                return <li>{children}</li>;
               }
             }} 
         >
           {content + ((activeTab==='Notebook')?annotToMD(annotations):"")}
         </ReactMarkdown></>)}
       </div>
-      <hr/>
       <div className="lbar">
         {Object.entries(index.current.languages).map(([i,v]) => {
           return <button className={`lbutton ${activeLanguage==i?'active':''}`}
                          onClick={() => {setLanguage(i)}}
                          key={i}> {v} </button>
         })}
-        <hr width="1" size="100px" />
+        -
         <button className="lbutton" 
                 onClick={() => {console.log("todo")}}>Add Stop</button>
         <button className="lbutton" 
-                onClick={() => {console.log("todo")}}>⬇ Markdown</button>
+                onClick={() => {console.log("todo")}}>⬇ MD</button>
         <button className="lbutton" 
-                onClick={() => {console.log("todo")}}>⬇ Pointcloud</button>
+                onClick={() => {console.log("todo")}}>⬇ Cloud</button>
       </div>
     </div>
   );

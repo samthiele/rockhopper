@@ -41,8 +41,8 @@ padding: 8px;
     flex: 1;
     padding: 15px;
     overflow-y: scroll;
-    margin-top: 3em;
-    margin-bottom: 2em;
+    margin-top: 2.5em;
+    margin-bottom: 3em;
 }
 .tabs {
     position: absolute;
@@ -94,5 +94,29 @@ padding: 8px;
     color: white;
     font-weight: bold;
     border: 1px solid #0056b3;
+}
+
+.correct {
+    accent-color: green;
+    color: white;
+    text-align: center;
+}
+
+.question {
+    list-style-type: none
+}
+.incorrect {
+    accent-color: red;
+    color: white;
+    text-align: center;
+    position: relative;
+}
+.incorrect::after {
+    content: "✖";
+    font-size: 16px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
