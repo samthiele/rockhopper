@@ -41,9 +41,9 @@ function colourise(cloud, array, settings = null, key = null, offset=0){
       }
   } else {
       // Case 2: Ternary mapping (R, G, B)
-      let [ix0, ix1, ix2, c] = [value.color['R'][0],
+      let [ix0, ix1, ix2] = [value.color['R'][0],
                                 value.color['G'][0],
-                                value.color['B'][0],0];
+                                value.color['B'][0]];
       for (let i = offset; i < n; i++){ // compute colour or each point
         const c = [(array.get([i, ix0]) - value.color['R'][1])/(value.color['R'][2] - value.color['R'][1]),
         (array.get([i, ix1]) - value.color['G'][1])/(value.color['G'][2] - value.color['G'][1]),
@@ -58,40 +58,81 @@ function colourise(cloud, array, settings = null, key = null, offset=0){
 }
 
 // define function to highlight points
-const applyHighlight = (cloud, array, highlight, offset=0) => {
+const applyHighlight = (cloud, array, group, offset=0) => {
   const n = cloud.geometry.drawRange.count; // number of points to change colour
-  // get highlight settings
-  const [index,iq,thresh] = highlight.iq;
-  const c2 = highlight.color;
-  const f = highlight.blend;
+  // function for highlighting stuff
+  const c2 = group.color || [1,1,0];
+  const f = group.blend || 0.5;
   const blend = (c1) => {
-    return [
+    return [ // combine two colours
       c1[0]*(1-f) + c2[0]*f,
       c1[1]*(1-f) + c2[1]*f,
       c1[2]*(1-f) + c2[2]*f,
-    ] }
+    ] };
   
   // update colours to include the highlight
-  let [r,g,b,v] = [0,0,0,0];
-  for (let i = offset; i < n; i++){
-    r = cloud.geometry.attributes.color.array[i*3];
-    g = cloud.geometry.attributes.color.array[i*3+1];
-    b = cloud.geometry.attributes.color.array[i*3+2];
-    v = array.get([i, index]);
-
-    if (iq === '='){
-      if (v === thresh) [r,g,b] = blend([r,g,b]); // blend colour
-    } else if (iq === '<' ){
-      if (v <= thresh) [r,g,b] = blend([r,g,b]); // blend colour
-    } else if (iq === '>'){
-      if (v >= thresh) [r,g,b] = blend([r,g,b]); // blend colour
-    } else if (iq === '!='){
-      if (v !== thresh) [r,g,b] = blend([r,g,b]); // blend colour
+  if (group.iq){
+    const [index,iq,thresh] = group.iq;
+    let [r,g,b,v] = [0,0,0,0];
+    for (let i = offset; i < n; i++){
+      r = cloud.geometry.attributes.color.array[i*3];
+      g = cloud.geometry.attributes.color.array[i*3+1];
+      b = cloud.geometry.attributes.color.array[i*3+2];
+      v = array.get([i, index]);
+      if (iq === '='){
+        if (v === thresh) [r,g,b] = blend([r,g,b]); // blend colour
+      } else if (iq === '<' ){
+        if (v <= thresh) [r,g,b] = blend([r,g,b]); // blend colour
+      } else if (iq === '>'){
+        if (v >= thresh) [r,g,b] = blend([r,g,b]); // blend colour
+      } else if (iq === '!='){
+        if (v !== thresh) [r,g,b] = blend([r,g,b]); // blend colour
+      }
+      
+      cloud.geometry.attributes.color.array.set( [r,g,b], i*3 );
     }
-    cloud.geometry.attributes.color.array.set( [r,g,b], i*3 );
   }
+
+  // mask points if needed
+  if (group.mask){
+    const [index,iq,thresh] = group.mask;
+    let v = 0;
+    for (let i = offset; i < n; i++){
+      v = array.get([i, index]);
+      if (iq === '='){
+        if (v === thresh) cloud.geometry.attributes.color.array.set( [0,0,0], i*3 ); // N.B. black is invisible
+      } else if (iq === '<' ){
+        if (v <= thresh) cloud.geometry.attributes.color.array.set( [0,0,0], i*3 ); // N.B. black is invisible
+      } else if (iq === '>'){
+        if (v >= thresh) cloud.geometry.attributes.color.array.set( [0,0,0], i*3 ); // N.B. black is invisible
+      } else if (iq === '!='){
+        if (v !== thresh) cloud.geometry.attributes.color.array.set( [0,0,0], i*3 ); // N.B. black is invisible
+      }
+    }
+  }
+
   cloud.geometry.attributes.color.needsUpdate = true;
 }
+
+const vertexShader = `
+varying vec3 vColor;
+uniform float worldSize;
+void main() {
+    vColor = color;
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = worldSize / -mvPosition.z; // Keeps size fixed in world space
+    gl_Position = projectionMatrix * mvPosition;
+}`;
+const fragmentShader = `
+    varying vec3 vColor;
+    void main() {
+        // discard fragments where the color is black (masked points)
+        if (vColor == vec3(0.0, 0.0, 0.0)) { discard; }
+
+        // otherwise draw
+        gl_FragColor = vec4(vColor, 1.0);
+    }
+`;
 
 const PointStream = ({ index, annotations, setAnnotations,
                        scene, renderer, cameraRef, controlsRef, 
@@ -106,7 +147,7 @@ const PointStream = ({ index, annotations, setAnnotations,
   const [seeds, setSeeds] = useState(null); // seed points to load chunks
   const [points, setPoints] = useState(null); // streamed point array
   const [streamed, setStreamed] = useState({}); // track which chunks have been loaded
-  const [highlight, setHighlight] = useState(null); // selected highlights
+  const [group, setGroup] = useState(null); // selected highlights
   const prevRGB = useRef(null); // used for turning highlight off quickly
   const [streamCount, setStreamCount] = useState(0); // number of points already streamed
   const [currentSite, setCurrentSite] = useState('start');
@@ -348,7 +389,7 @@ const PointStream = ({ index, annotations, setAnnotations,
         // add seed points element
         if (seedPoints.current) { scene.current.remove(seedPoints.current); }
         const material = new THREE.PointsMaterial({
-          size: 2, vertexColors: false, sizeAttenuation: true });
+            size: 2, vertexColors: false, sizeAttenuation: true });
         const points = new THREE.Points(geometry, material);
         scene.current.add(points);
         seedPoints.current = points;
@@ -424,14 +465,23 @@ const PointStream = ({ index, annotations, setAnnotations,
         geometry.setDrawRange( 0, streamCount+chunkData.shape[0] );
 
         const size = attrs.resolution || 0.1; // Default to 0.1 if missing
-        const material = new THREE.PointsMaterial({ 
-          size: 3.2*size,sizeAttenuation: true, vertexColors: true });
-        
+        //const material = new THREE.PointsMaterial({ 
+        //  size: 3.2*size,sizeAttenuation: true, vertexColors: true });
+        const material = new THREE.ShaderMaterial({
+          uniforms: {
+            worldSize: { value:2000*size } // window.innerHeight / 2 }
+          },
+          vertexShader: vertexShader,
+          fragmentShader: fragmentShader,
+          vertexColors: true,
+          //transparent: true
+        });
+
         const cloud = new THREE.Points(geometry, material);
         colourise( cloud, points, attrs.stylesheet, activeStyle, streamCount); // set colours
+        prevRGB.current = cloud.geometry.attributes.color.clone();
         scene.current.add(cloud);
         densePoints.current = cloud;
-        prevRGB.current = densePoints.current.geometry.attributes.color.clone(); // store backup of colours in case of highlighting
       } else {
         // update existing point cloud (add new points)
         const p = chunkData.get([null, slice(0,3)]).flatten();
@@ -440,10 +490,16 @@ const PointStream = ({ index, annotations, setAnnotations,
         densePoints.current.geometry.setDrawRange( 0, streamCount+chunkData.shape[0] );
         //densePoints.current.geometry.computeBoundingBox(); // need to update the bbox?
         densePoints.current.geometry.computeBoundingSphere(); // this is needed for picking
-        colourise( densePoints.current, points, attrs.stylesheet, activeStyle, streamCount);
-        prevRGB.current = densePoints.current.geometry.attributes.color.clone();
+        densePoints.current.geometry.attributes.color = prevRGB.current; // remove highlight
+        colourise( densePoints.current, points, attrs.stylesheet, activeStyle, streamCount); // compute colours for new points
+        densePoints.current.geometry.attributes.color = prevRGB.current.clone(); // store now "non-highlight" colours
       }
       
+      // apply highlights and masks?
+      if (group){
+        densePoints.current.geometry.attributes.color = prevRGB.current.clone();
+        applyHighlight(densePoints.current, points, attrs.groups[group]);
+      }
       // sleep a bit to not hog resources, then update everything
       await new Promise(r => setTimeout(r, LOAD_INTERVAL));
       setStreamed({...streamed} ); // update streamed object
@@ -544,7 +600,7 @@ const PointStream = ({ index, annotations, setAnnotations,
                       colourise(densePoints.current, points, attrs.stylesheet, k);
                       prevRGB.current = densePoints.current.geometry.attributes.color.clone();
                       setActiveStyle(k);  
-                      setHighlight(null); }}
+                      setGroup(null); }}
       key={k}> {k} </button>
     });
     buttons.push(<input
@@ -555,18 +611,18 @@ const PointStream = ({ index, annotations, setAnnotations,
       style={{ width: '36px', height: '26px',
         border: 'none', padding: '0', background: 'none', cursor: 'pointer' }}
     />);
-    if (attrs.highlights){
-      buttons2 = Object.keys(attrs.highlights).map((k) => {
+    if (attrs.groups){
+      buttons2 = Object.keys(attrs.groups).map((k) => {
         return <button
-        className={`button ${highlight === k ? 'active' : ''}`}
-        onClick={() => {if (highlight === k){
-                          setHighlight(null);
-                          console.log("clear");
-                          densePoints.current.geometry.attributes.color = prevRGB.current;
+        className={`button ${group === k ? 'active' : ''}`}
+        onClick={() => {if (group === k){ // turn highlight off
+                          setGroup(null);
+                          densePoints.current.geometry.attributes.color = prevRGB.current.clone();
                           densePoints.current.geometry.attributes.color.needsUpdate = true;
-                        } else {
-                          setHighlight(k);
-                          applyHighlight(densePoints.current, points, attrs.highlights[k]); }
+                        } else { // turn highlight on
+                          densePoints.current.geometry.attributes.color = prevRGB.current.clone();
+                          setGroup(k);
+                          applyHighlight(densePoints.current, points, attrs.groups[k]); }
                         }}
         key={k}> {k} </button>
       });

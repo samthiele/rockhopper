@@ -12,7 +12,9 @@
     gap: 4px; /* Space between columns */
 }
 .button {
-    padding: 4px 12px;
+    padding: 4px 8px;
+    margin-left: 2px;
+    margin-right: 2px;
     cursor: pointer;
     text-align: center;
     background-color: #ddd;
