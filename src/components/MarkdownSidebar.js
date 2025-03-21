@@ -63,6 +63,7 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
   const [markdown, setMarkdown] = useState(null); // loaded .md files
   const currentSite = useState('start');
   const [content, setContent] = useState(''); // md content to draw
+  const cache = useRef({}); // md cache to allow edits
   const [editedContent, setEditedContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const markdownRef = useRef(null);
@@ -83,18 +84,18 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
     async function loadMD(){
       const mdown = {...markdown}; // put fetched markdown here
       for (const k of Object.keys(tabs)) {
-        // notes are special -- we only load those once
-        if (!(k.toLowerCase()==="notebook" && "notebook" in mdown)){ 
-          // otherwise, fetch away!
-          mdown[k.toLowerCase()] = await fetchMarkdown( tabs[k][activeLanguage] );
-        }
+        const url = tabs[k][activeLanguage];
+        if (!(url in cache.current)){
+          cache.current[url] = await fetchMarkdown( tabs[k][activeLanguage] );
+        } 
+        mdown[k.toLowerCase()] = {url:url, text:cache.current[url]};
       }
       setMarkdown( mdown ) // update MD
       if (activeTab.toLowerCase() in mdown){
-        setContent( mdown[activeTab.toLowerCase()] );
+        setContent( mdown[activeTab.toLowerCase()].text );
       } else{
         const t = Object.keys(index.current.tabs)[0];
-        setContent( mdown[t.toLowerCase()] );
+        setContent( mdown[t.toLowerCase()].text );
         setActiveTab(t.toLowerCase());
       }
     }
@@ -118,7 +119,8 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
     };
     const handleKeyDown = (event) => {
       if (event.shiftKey && event.key === 'Enter') {
-        markdown[activeTab] = editedContent;
+        markdown[activeTab].text = editedContent; // update markdown text
+        cache.current[markdown[activeTab].url] = editedContent; // also update cache
         setMarkdown({...markdown}); // update "stored" markdown 
         setContent(editedContent); // update displayed content
         setIsEditing(false); // no longer editing
@@ -135,7 +137,7 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
         { Object.keys(tabs).map( (k) => {
           return <button
             className={`tab ${activeTab.toLowerCase() === k.toLowerCase() ? 'active' : ''}`}
-            onClick={() => {setActiveTab(k.toLowerCase()); setContent( markdown[k.toLowerCase()] );}}
+            onClick={() => {setActiveTab(k.toLowerCase()); setContent( markdown[k.toLowerCase()].text );}}
             key={k}
           > {k} </button>
         }) }

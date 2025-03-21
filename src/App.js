@@ -20,7 +20,7 @@ const App = () => {
   const [activeStyle, setActiveStyle] = useState(null);
 
   useEffect(() => {
-    fetch('/index.json')
+    fetch('./index.json')
       .then(response => response.json())
       .then(data => {
         index.current = data;
