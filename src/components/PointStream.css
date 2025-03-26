@@ -30,3 +30,15 @@
     font-weight: bold;
     border: 1px solid #0056b3;
 }
+.labeldiv {
+    background-color: lightgray;
+    border-radius: 15px;
+    padding: 10px;
+    border: 1.5px solid black;
+    pointer-events: all;
+    display: flex;
+    flex-direction: column;
+}
+.labeldiv:hover {
+    background-color: white;
+  }

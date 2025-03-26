@@ -5,6 +5,8 @@ import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+
 import { openGroup, HTTPStore, slice, NestedArray } from "zarr";
 import chroma from 'chroma-js';
 import './PointStream.css';
@@ -138,6 +140,7 @@ const PointStream = ({ index, annotations, setAnnotations,
                        scene, renderer, cameraRef, controlsRef, 
                        activeStyle, setActiveStyle}) => {
   const mountRef = useRef(null); // three.js mount component
+  const labelRenderer = useRef(null); // three.js label renderer
   const seedPoints = useRef(null); // seeds for streaming dense point cloud
   const densePoints = useRef(null); // dense point cloud
 
@@ -148,6 +151,8 @@ const PointStream = ({ index, annotations, setAnnotations,
   const [points, setPoints] = useState(null); // streamed point array
   const [streamed, setStreamed] = useState({}); // track which chunks have been loaded
   const [group, setGroup] = useState(null); // selected highlights
+  const [annotVis, setAnnotVis] = useState(true); // view or hide annotations
+  const [labelVis, setLabelVis] = useState(true); // view or hide annotations
   const prevRGB = useRef(null); // used for turning highlight off quickly
   const [streamCount, setStreamCount] = useState(0); // number of points already streamed
   const [currentSite, setCurrentSite] = useState('start');
@@ -159,6 +164,7 @@ const PointStream = ({ index, annotations, setAnnotations,
   const spheresRef = useRef([]); // Stores annotation spheres
   const lineRef = useRef([]); // Stores annotation lines
   const planeRef = useRef([]); // Stores annotation planes
+  const labelRef = useRef([]); // Stores label elements
 
   // Setup three.js scene, renderer, camera and view controls
   useEffect(() => {
@@ -175,12 +181,21 @@ const PointStream = ({ index, annotations, setAnnotations,
     renderer.current.setSize(width, height);
     mount.appendChild(renderer.current.domElement);
 
+    // Initialize CSS2DRenderer
+    labelRenderer.current = new CSS2DRenderer();
+    labelRenderer.current.setSize(width, height);
+    labelRenderer.current.domElement.style.position = 'absolute';
+    labelRenderer.current.domElement.style.top = '0px';
+    labelRenderer.current.domElement.style.pointerEvents = 'none';
+    mount.appendChild(labelRenderer.current.domElement);
+
     // Initialize Camera
     cameraRef.current = new THREE.PerspectiveCamera(60, width / height, 0.1, 5000);
     cameraRef.current.up.set(0, 0, 1);
 
     // Orbit Controls
     const controls = new OrbitControls(cameraRef.current, renderer.current.domElement);
+    //const controls = new OrbitControls(cameraRef.current, labelRenderer.current.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controls.screenSpacePanning = true;
@@ -189,6 +204,7 @@ const PointStream = ({ index, annotations, setAnnotations,
     // Handle Resize
     const handleResize = () => {
       renderer.current.setSize(mount.clientWidth, mount.clientHeight);
+      labelRenderer.current.setSize(mount.clientWidth, mount.clientHeight);
       cameraRef.current.aspect = mount.clientWidth / mount.clientHeight;
       cameraRef.current.updateProjectionMatrix();
       controlsRef.current.update();
@@ -201,6 +217,7 @@ const PointStream = ({ index, annotations, setAnnotations,
       requestAnimationFrame(animate);
       controls.update();
       renderer.current.render(scene.current, cameraRef.current);
+      labelRenderer.current.render(scene.current, cameraRef.current);
     };
     animate();
 
@@ -510,9 +527,52 @@ const PointStream = ({ index, annotations, setAnnotations,
     loadClosestChunk();
   }, [seeds, points, streamCount]);
 
+  // **Add labels **
+  const createLabel = (html, position) => {
+    // add a 3D object
+    const size = attrs.resolution || 0.1; // Default to 0.1 if missing
+    const sphereGeometry = new THREE.SphereGeometry(size*3, 16, 16);
+    const mat = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+    const sphere = new THREE.Mesh(sphereGeometry, mat);
+    sphere.position.copy(position);
+    scene.current.add(sphere);
+    labelRef.current.push(sphere);
+
+    // add corresponding 2D (HTML) object
+    const labelDiv = document.createElement( 'div' );
+    labelDiv.className = 'labeldiv';
+    labelDiv.innerHTML = html;
+    const label = new CSS2DObject( labelDiv );
+    label.position.set( 0, 0, 0 );
+    label.center.set( 0, 0 );
+    sphere.add( label );
+  };
+
+  // Create and add html labels
+  useEffect(()=>{
+  if (nostream || (!attrs)){ return };
+    labelRef.current.forEach( (obj) => {
+      scene.current.remove(obj);
+      obj.geometry.dispose();
+      obj.material.dispose();
+      obj.children.forEach( (c) => {obj.remove(c)});
+    } );
+    labelRef.current = [];
+    if (!labelVis) return; // don't draw labels
+
+    if (index.current.sites[currentSite].labels) {
+        Object.keys(index.current.sites[currentSite].labels).forEach( (k) => {
+          const lab = index.current.sites[currentSite].labels[k];
+          const pos = new THREE.Vector3(...lab.pos);
+          pos.sub(new THREE.Vector3(...attrs.origin));
+          createLabel(lab.html, pos);
+        } );
+    }
+  },[currentSite, nostream, attrs, labelVis]);
+
   // ** Draw annotations **
   useEffect(()=>{
-    if (nostream){ return };
+    if (nostream) return;
 
     // clear annotations
     [spheresRef, lineRef, planeRef].forEach( (ref)=>{
@@ -521,9 +581,9 @@ const PointStream = ({ index, annotations, setAnnotations,
         obj.geometry.dispose();
         obj.material.dispose();
     })});
-
     spheresRef.current = [];
-    
+    if (!annotVis) return; // don't draw annotations
+
     // Add a yellow sphere to highlight selected points
     if (attrs){
       const size = attrs.resolution || 0.1; // Default to 0.1 if missing
@@ -549,7 +609,7 @@ const PointStream = ({ index, annotations, setAnnotations,
     annotations.lines.forEach( (l) => { drawLine(l) } );
     annotations.planes.forEach( (l) => { drawPlane(l) } );
     annotations.traces.forEach( (l) => { drawLine(l) } );
-  }, [selection, attrs, annotations, annotColor]);
+  }, [selection, attrs, annotations, annotColor, annotVis]);
 
   // **Function to Draw a Line Between Two Points**
   const drawLine = (points) => {
@@ -639,6 +699,8 @@ const PointStream = ({ index, annotations, setAnnotations,
         </div>
         <div className="row2">
           { buttons2 }
+          <button className={`button ${labelVis ? 'active' : ''}`} onClick={() => { setLabelVis(!labelVis)}}>Labels</button>
+          <button className={`button ${annotVis ? 'active' : ''}`} onClick={() => { setAnnotVis(!annotVis)}}>Annotations</button>
         </div>
       </div>
       <div className="viewer" ref={mountRef} style={{ height: "100%", width: "100%" }} />

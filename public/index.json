@@ -8,13 +8,17 @@
             "tabs":{"Guide":[ "./site1-2/guide_en.md", "./site1-2/guide_de.md" ]},
             "mediaType": "cloud",
             "mediaURL": "https://storage.googleapis.com/rockhopper/dolomites.zarr",
-            "view":{"pos":[133, -3, 3], "tgt":[77, 50, -28], "style" : "rgb"}
+            "view":{"pos":[133, -3, 3], "tgt":[77, 50, -28], "style" : "rgb"},
+            "labels":{"site1":{ "pos":[273972,5152849,2292], "html":"<a href='./#site1'>Site 1</a>"},
+                     "site2":{ "pos":[273798,5152711,2339], "html":"<a href='./#site2'>Site 2</a><img src='https://upload.wikimedia.org/wikipedia/commons/4/41/Pet_rock.jpg' width='100px'>"}}
         },
         "site2":{
             "tabs":{"Guide":[ "./site1-2/guide_en.md", "./site1-2/guide_de.md" ]},
             "mediaType": "cloud",
             "mediaURL": "https://storage.googleapis.com/rockhopper/dolomites.zarr",
-            "view":{"pos":[-53, -127, 45], "tgt":[-91, -81, 24], "style":"illu"}
+            "view":{"pos":[-53, -127, 45], "tgt":[-91, -81, 24], "style":"illu"},
+            "labels":{"site1":{ "pos":[273972,5152849,2292], "html":"<a href='./#site1'>Site 1</a>"},
+                      "site2":{ "pos":[273798,5152711,2339], "html":"<a href='./#site2'>Site 2</a>"}}
         },
         "site3":{
             "tabs":{"Guide":[ "./site3/guide_en.md", "./site3/guide_de.md" ]},
