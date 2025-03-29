@@ -205,10 +205,51 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
                 return <li>{children}</li>;
               },
               blockquote : ({node, children}) => {
-                // todo -- implement "custom" markdown components here!
-                // (e.g., stereonets)
-                const command = children[1].props.children;
-                console.log(command);
+                // unwrap blockquote command
+                const unwrap = ( cmd ) => {
+                  if (Array.isArray(cmd)){
+                    return cmd.map( (el) => {
+                      if (el.props){
+                        return unwrap(el.props.children); // React element
+                      } else {
+                        return el.trim(); // string
+                      }
+                    }).join(' ');
+                  } else {
+                    return cmd.trim();
+                  }
+                }
+                const command = unwrap( children[1].props.children );
+                const parts = command.split(' ');
+
+                // audio?
+                if (parts[0] === 'audio' && (parts.length == 2)) {
+                  const srcUrl = parts[1].trim();
+                  return (
+                    <div>
+                      <audio controls style={{width: "100%"}}>
+                        <source src={srcUrl} type="audio/mpeg"/>
+                        Your browser does not support the audio element.
+                      </audio>
+                    </div>
+                  );
+                }
+                if (parts[0] === 'youtube' && (parts.length) == 2){
+                  const srcUrl = parts[1].trim();
+                  return (
+                    <div>
+                      <iframe style={{width:"100%", height:"315px", paddingTop: "1em" }} 
+                      src={srcUrl} title="Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen;" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                    </div>
+                  );
+                }
+                // youtube video
+
+                //
+
+                // stereonet? [ todo ]
+                
+                // not a command; return a normal block quote
                 return <blockquote>{children}</blockquote>
               }
             }} 

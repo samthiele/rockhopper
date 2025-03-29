@@ -33,6 +33,14 @@ Are penguins punks?
 
 ---
 
+Audio is also possible - do you think RockHoppers can sing?
+
+> audio https://xeno-canto.org/sounds/uploaded/YYMEPEMBFR/XC952603-S_Rock_Hop_West_Pt_Falkland_Is.mp3
+
+And youtube videos too!
+
+> youtube https://www.youtube.com/embed/lVD1WaMaqDc?si=jXZzNdHYJXJSLbYg
+
 ## Linking to headings and sites
 
 The hash part of the URL can be used to create links in the markdown to specific headings in this markdown file (defined using # or ##). You can see this in action by clicking [here](./#site2) or [here](./#guide).

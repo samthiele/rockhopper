@@ -236,21 +236,23 @@ const PointStream = ({ index, annotations, setAnnotations,
     if (params.site === currentSite) return; //nothing to do here
     const site = index.current.synonyms[params.site];
     if (site in index.current.sites){
-      if (attrs && densePoints.current && points){
-        colourise(densePoints.current, points, 
-                  attrs.stylesheet, index.current.sites[site].view.style);
-        prevRGB.current = densePoints.current.geometry.attributes.color.clone();
-      }
-      setActiveStyle(index.current.sites[site].style);
-      setCurrentSite(params.site); // store that this is the current scene so we don't redraw unecessarily
-      const center = new THREE.Vector3(...index.current.sites[site].view.tgt);
-      cameraRef.current.position.set(...index.current.sites[site].view.pos);
-      cameraRef.current.lookAt(center);
-      controlsRef.current.target.copy(center);
-      controlsRef.current.update();
-    } else if (site === 'downloadPoints'){
-      console.log("TODO - download our point cloud as CSV");
-    }
+      if (index.current.sites[site].view) {
+        if (attrs && densePoints.current
+                  && points && index.current.sites[site].view.style){
+          colourise(densePoints.current, points, 
+                    attrs.stylesheet, index.current.sites[site].view.style);
+          prevRGB.current = densePoints.current.geometry.attributes.color.clone();
+          setActiveStyle(index.current.sites[site].style);
+        }
+        if (index.current.sites[site].view.tgt){
+          const center = new THREE.Vector3(...index.current.sites[site].view.tgt);
+          cameraRef.current.position.set(...index.current.sites[site].view.pos);
+          cameraRef.current.lookAt(center);
+          controlsRef.current.target.copy(center);
+          controlsRef.current.update();
+        }
+    }}
+    setCurrentSite(params.site); // store that this is the current scene so we don't redraw unecessarily
   },[params, currentSite]);
 
   // Handle click and key events
@@ -265,6 +267,7 @@ const PointStream = ({ index, annotations, setAnnotations,
       )
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouse, cameraRef.current);
+      raycaster.params.Points.threshold = attrs.resolution || 0.1; // point size for picking
       return raycaster.intersectObjects(scene.current.children, true)
     }
 
@@ -370,12 +373,13 @@ const PointStream = ({ index, annotations, setAnnotations,
       renderer.current.domElement.removeEventListener("dblclick", handleDoubleClick);
       renderer.current.domElement.removeEventListener("click", handleSingleClick);
     };
-  }, [selection]);
+  }, [selection, attrs]);
   
   // Load seeds (chunk centers) and draw them
   useEffect(()=> {
     if (!controlsRef.current || !cameraRef.current || nostream) return;
-    const url = index.current.sites[ site ].mediaURL;
+    console.log(currentSite);
+    const url = index.current.sites[ currentSite ].mediaURL;
     if (url === currentMedia) return; // nothing to do here
     console.log(`Loading cloud from ${url}`);
     async function loadZarr() {
@@ -384,6 +388,7 @@ const PointStream = ({ index, annotations, setAnnotations,
         const zGroup = await openGroup(new HTTPStore( url )); // dataset
         const zCenters = await zGroup.getItem("chunk_centers"); // chunk centers array
         const seeds = await zCenters.get([null, null]); // chunk centers data
+        console.log(seeds.shape)
         setSource(zGroup); // store zarr group for later access (during streaming)
         setSeeds(seeds); // store seed data
 
@@ -393,9 +398,6 @@ const PointStream = ({ index, annotations, setAnnotations,
         setActiveStyle(attributes.styles[0]);
         console.log(attributes);
 
-        // initialise arrays that will hold our dense points
-        setPoints(new NestedArray(null, [attributes.total,seeds.shape[1]],'<f4'));
-        
         // add seed points to scene
         const geometry = new THREE.BufferGeometry();
         const xyz = seeds.get([null, slice(0,3)]).flatten();
@@ -403,8 +405,13 @@ const PointStream = ({ index, annotations, setAnnotations,
         geometry.computeBoundingBox();
         const bbox = geometry.boundingBox;
         
-        // add seed points element
-        if (seedPoints.current) { scene.current.remove(seedPoints.current); }
+        // initialise arrays that will hold our dense points
+        // and create associated Three.js scene objects
+        setPoints(new NestedArray(null, [attributes.total,seeds.shape[1]],'<f4'));
+        setStreamed({});
+        setStreamCount(0);
+        if (seedPoints.current) { scene.current.remove(seedPoints.current); seedPoints.current=null;}
+        if (densePoints.current) { scene.current.remove(densePoints.current); densePoints.current=null;}
         const material = new THREE.PointsMaterial({
             size: 2, vertexColors: false, sizeAttenuation: true });
         const points = new THREE.Points(geometry, material);
@@ -415,7 +422,9 @@ const PointStream = ({ index, annotations, setAnnotations,
         const site = params.site;
         let center = new THREE.Vector3();
         let pos;
-        if (site in index.current.sites){
+        if (site in index.current.sites 
+            && index.current.sites[site].view
+            && index.current.sites[site].view.tgt){
           center = new THREE.Vector3(...index.current.sites[site].view.tgt);
           pos = index.current.sites[site].view.pos;
         } else {
@@ -434,11 +443,11 @@ const PointStream = ({ index, annotations, setAnnotations,
     }
     loadZarr();
     setCurrentMedia( url );
-  }, [])
+  }, [currentSite])
 
   // **Lazy Loading Closest Chunk**
   useEffect(() => {
-    if (!cameraRef || !seeds || !source || !points || nostream) return;
+    if (!cameraRef || !seeds || !source || !points || nostream || !seedPoints.current) return;
 
     const loadClosestChunk = async () => {
       const camPos = new THREE.Vector3();
@@ -468,10 +477,14 @@ const PointStream = ({ index, annotations, setAnnotations,
       // or there are...
       const chunk = await source.getItem(`c${closestIndex}`) // load chunk data
       const chunkData = await chunk.get([null, null]);
-      points.set([slice(streamCount,streamCount+chunkData.shape[0]), null], 
-                  chunkData);
-      streamed[closestIndex] = true;
-      
+      try {
+        points.set([slice(streamCount,streamCount+chunkData.shape[0]), null], 
+                    chunkData);
+        streamed[closestIndex] = true;
+      } catch (error){
+        return; // happens when someone changes the URL while fetch is being called
+      }
+
       // create new point cloud? (this is the first chunk)
       if (!densePoints.current){
         const p = points.get([null, slice(0,3)]).flatten();
@@ -525,7 +538,7 @@ const PointStream = ({ index, annotations, setAnnotations,
     }
     // Load closest chunk; note that this changes the streamCount which triggers a recall
     loadClosestChunk();
-  }, [seeds, points, streamCount]);
+  }, [seeds, points, streamCount, currentMedia]);
 
   // **Add labels **
   const createLabel = (html, position) => {
@@ -559,15 +572,16 @@ const PointStream = ({ index, annotations, setAnnotations,
     } );
     labelRef.current = [];
     if (!labelVis) return; // don't draw labels
-
-    if (index.current.sites[currentSite].labels) {
-        Object.keys(index.current.sites[currentSite].labels).forEach( (k) => {
-          const lab = index.current.sites[currentSite].labels[k];
-          const pos = new THREE.Vector3(...lab.pos);
-          pos.sub(new THREE.Vector3(...attrs.origin));
-          createLabel(lab.html, pos);
-        } );
-    }
+    if (index.current.sites) {
+      if (index.current.sites[currentSite]) {
+        if (index.current.sites[currentSite].labels) {
+            Object.keys(index.current.sites[currentSite].labels).forEach( (k) => {
+              const lab = index.current.sites[currentSite].labels[k];
+              const pos = new THREE.Vector3(...lab.pos);
+              pos.sub(new THREE.Vector3(...attrs.origin));
+              createLabel(lab.html, pos);
+            } );
+    }}}
   },[currentSite, nostream, attrs, labelVis]);
 
   // ** Draw annotations **
