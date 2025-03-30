@@ -4,6 +4,12 @@
   margin: 0;
   position: relative;
 }
+.outer.landscape {
+  flex-direction: row;
+}
+.outer.portrait {
+  flex-direction: column;
+}
 .left {
   display: flex;
   flex-direction: column;
@@ -21,9 +27,17 @@
   background-color: #b6b6b6;
 }
 .resizer {
-  width: 5px;
-  cursor: ew-resize;
   background-color: #ddd;
   position: relative;
   z-index: 1;
+}
+.resizer.landscape {
+  width: 10px;
+  height: 100%;
+  cursor: ew-resize;
+}
+.resizer.portrait {
+  width: 100%;
+  height: 10px;
+  cursor: ns-resize;
 }

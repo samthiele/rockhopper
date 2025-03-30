@@ -253,6 +253,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
     // Create and add html labels
     useEffect(()=>{
         if (!init) return;
+        console.log("deleting labels");
 
         // clear previous labels
         labelRef.current.forEach( (obj) => {
@@ -266,6 +267,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
 
         // add labels
         if (tour.sites[site].labels) {
+            console.log("adding labels");
             Object.keys(tour.sites[site].labels).forEach( (k) => {
                 const lab = tour.sites[site].labels[k];
                 drawLabel(lab.html, new THREE.Vector3(...lab.pos));
@@ -321,6 +323,19 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         label.position.copy(position);
         labelRef.current.push(label);
         three.current.scene.add( label );
+
+        const dblclick = (evt) => {
+            // todo; delete label from labelRef and three.current.scene
+            // Remove the label from labelRef
+            const index = labelRef.current.indexOf(label);
+            if (index > -1) {
+                labelRef.current.splice(index, 1);
+            }
+
+            // Remove the label from three.current.scene
+            three.current.scene.remove(label);
+        }
+        labelDiv.addEventListener("dblclick", dblclick);
     };
 
     // **Function to Draw a Line Between Two Points**
