@@ -12,6 +12,10 @@
     font-family: monospace;
     border: 1px solid #ddd;
 }
+.markdownParagraph {
+    padding-top: 0.6em;
+    text-align:justify;
+}
 table {
     text-align: left;
     width: 90%;

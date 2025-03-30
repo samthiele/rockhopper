@@ -1,36 +1,40 @@
 {
+    "devmode" : true,
     "languages": [ "en", "de" ],
-    "tabs":{ "Notebook":[ "./notes_en.md", "./notes_de.md" ],
-             "References":[ "./references_en.md", "./references_de.md" ],
-             "Help":[ "./help_en.md","./help_de.md"]},
+    "tabs":{ "Notebook":[ "./md/notes_en.md", "./md/notes_de.md" ],
+             "References":[ "./md/references_en.md", "./md/references_de.md" ],
+             "Help":[ "./md/help_en.md","./md/help_de.md"]},
     "sites":{
-        "start":{
-            "tabs":{"Guide":[ "./site1-2/guide_en.md", "./site1-2/guide_de.md" ]},
-            "mediaType": "cloud",
-            "mediaURL": "https://storage.googleapis.com/rockhopper/dolomites.zarr",
-            "labels":{"site1":{ "pos":[273972,5152849,2292], "html":"<p>Labels display HTML content</p><a href='./#site2'>View Site 2</a><img src='https://upload.wikimedia.org/wikipedia/commons/4/41/Pet_rock.jpg' width='250px'>"},
-                     "site2":{ "pos":[273798,5152711,2339], "html":"<a href='./#site1'>View Site 1</a>"}}
-        },
         "site1":{
-            "tabs":{"Guide":[ "./site1-2/guide_en.md", "./site1-2/guide_de.md" ]},
+            "tabs":{"Guide":[ "./md/guide_en.md", "./md/guide_de.md" ]},
             "mediaType": "cloud",
             "mediaURL": "https://storage.googleapis.com/rockhopper/dolomites.zarr",
-            "view":{"pos":[133, -3, 3], "tgt":[77, 50, -28], "style" : "rgb"},
-            "labels":{"site1":{ "pos":[273972,5152849,2292], "html":"<p>Labels display HTML content</p><a href='./#site2'>View Site 2</a><img src='https://upload.wikimedia.org/wikipedia/commons/4/41/Pet_rock.jpg' width='250px'>"},
-                     "site2":{ "pos":[273798,5152711,2339], "html":"<a href='./#site1'>View Site 1</a>"}}
-        },
+            "view":{"pos":[ 80, -15, 27 ], "tgt":[ 54, 48, -16 ], "style" : "rgb", "group":"none"},
+            "labels":{"site2":{"pos":[76,47,-29], "html":"<a href='./#/site2'>View Site 2</a>"},
+                      "coolrock":{"pos":[42,22,-18], "html":"<div>I found some rocks here</div><img src='https://upload.wikimedia.org/wikipedia/commons/4/41/Pet_rock.jpg' width='250px'>"},
+                      "mountains":{"pos":[88,64,-26], "html":"<a href='./#/site3'>Go to the mountains</a>"},
+                      "beach":{ "pos":[92,56,-36], "html":"<a href='./#/site4'>Go to the beach</a>"}
+              } },
         "site2":{
-            "tabs":{"Guide":[ "./site1-2/guide_en.md", "./site1-2/guide_de.md" ]},
+            "tabs":{"Guide":[ "./md/guide_en.md", "./md/guide_de.md" ]},
             "mediaType": "cloud",
             "mediaURL": "https://storage.googleapis.com/rockhopper/dolomites.zarr",
-            "view":{"pos":[-53, -127, 45], "tgt":[-91, -81, 24], "style":"illu"},
-            "labels":{"site1":{ "pos":[273972,5152849,2292], "html":"<p>Labels display HTML content</p><a href='./#site2'>View Site 2</a><img src='https://upload.wikimedia.org/wikipedia/commons/4/41/Pet_rock.jpg' width='250px'>"},
-                     "site2":{ "pos":[273798,5152711,2339], "html":"<a href='./#site1'>View Site 1</a>"}}
+            "view":{"pos":[-79, -132, 40], "tgt":[-91, -81, 24], "style":"carbonate", "group":"dolomite"},
+            "labels":{"site1":{ "pos":[-99,-99,19], "html":"<a href='./#/site1'>View Site 1</a>"}}
         },
         "site3":{
-            "tabs":{"Guide":[ "./site3/guide_en.md", "./site3/guide_de.md" ]},
-            "mediaType": "cloud",
-            "mediaURL": "http://127.0.0.1:3002/Streams/LosAndenes1.zarr"}
+            "tabs":{"Guide":[ "./md/guide_en.md", "./md/guide_de.md" ]},
+            "view":{"pos":[-1.6836, -3.1561, -9.338], "tgt":[0, 0, 0]},
+            "mediaType": "photosphere",
+            "mediaURL": "./photosphere/pano_small.jpg",
+            "labels":{"outcrop":{"pos":[31,22,91], "html":"<a href='./#/site1'>Go to outcrop</a>"}}
+        },
+        "site4":{
+            "tabs":{"Guide":[ "./md/guide_en.md", "./md/guide_de.md" ]},
+            "mediaType":"cloud",
+            "mediaURL":"https://storage.googleapis.com/rockhopper/LaPalma.zarr",
+            "labels":{"outcrop":{"pos":[1725, -15143, 1919], "html":"<a href='./#/site1'>Back to the mountains</a>"}}
+        }
     },
     "synonyms" : {
         "start":"site1",

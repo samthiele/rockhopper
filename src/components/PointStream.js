@@ -1,18 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from 'react-router-dom';
 import * as THREE from "three";
-import { Line2 } from 'three/addons/lines/Line2.js';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-
 import { openGroup, HTTPStore, slice, NestedArray } from "zarr";
 import chroma from 'chroma-js';
-import './PointStream.css';
+import './ThreeScene.css';
 
 const LOAD_INTERVAL = 100; // ms to sleep between loading new chunks
-const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 const nostream = false; // quickly disable streaming (for dev purposes)
 
 // recompute a point cloud colour array from the source
@@ -116,6 +109,7 @@ const applyHighlight = (cloud, array, group, offset=0) => {
   cloud.geometry.attributes.color.needsUpdate = true;
 }
 
+// shaders used to draw points better
 const vertexShader = `
 varying vec3 vColor;
 uniform float worldSize;
@@ -136,11 +130,8 @@ const fragmentShader = `
     }
 `;
 
-const PointStream = ({ index, annotations, setAnnotations,
-                       scene, renderer, cameraRef, controlsRef, 
-                       activeStyle, setActiveStyle}) => {
-  const mountRef = useRef(null); // three.js mount component
-  const labelRenderer = useRef(null); // three.js label renderer
+const PointStream = ({ tour, site, three, init, currentMedia }) => {
+  // objects that will be added to three.js scene
   const seedPoints = useRef(null); // seeds for streaming dense point cloud
   const densePoints = useRef(null); // dense point cloud
 
@@ -150,252 +141,46 @@ const PointStream = ({ index, annotations, setAnnotations,
   const [seeds, setSeeds] = useState(null); // seed points to load chunks
   const [points, setPoints] = useState(null); // streamed point array
   const [streamed, setStreamed] = useState({}); // track which chunks have been loaded
-  const [group, setGroup] = useState(null); // selected highlights
-  const [annotVis, setAnnotVis] = useState(true); // view or hide annotations
-  const [labelVis, setLabelVis] = useState(true); // view or hide annotations
-  const prevRGB = useRef(null); // used for turning highlight off quickly
   const [streamCount, setStreamCount] = useState(0); // number of points already streamed
-  const [currentSite, setCurrentSite] = useState('start');
-  const [currentMedia, setCurrentMedia] = useState(''); // current media we are connected to
 
-  // annotation states
-  const [annotColor, setAnnotColor] = useState('#ffcd00'); // 0xffff00
-  const [selection, setSelection] = useState([]);
-  const spheresRef = useRef([]); // Stores annotation spheres
-  const lineRef = useRef([]); // Stores annotation lines
-  const planeRef = useRef([]); // Stores annotation planes
-  const labelRef = useRef([]); // Stores label elements
+  // styling
+  const [group, setGroup] = useState(null); // selected highlights
+  const prevRGB = useRef(null); // used for turning highlight off quickly
+  const [activeStyle, setActiveStyle] = useState(null);
 
-  // Setup three.js scene, renderer, camera and view controls
-  useEffect(() => {
-    if (nostream){ return };
-    const mount = mountRef.current;
-    const width = mount.clientWidth;
-    const height = mount.clientHeight;
-    
-    // Create a new Scene
-    scene.current = new THREE.Scene();
-
-    // Initialize Renderer
-    renderer.current = new THREE.WebGLRenderer({ antialias: true });
-    renderer.current.setSize(width, height);
-    mount.appendChild(renderer.current.domElement);
-
-    // Initialize CSS2DRenderer
-    labelRenderer.current = new CSS2DRenderer();
-    labelRenderer.current.setSize(width, height);
-    labelRenderer.current.domElement.style.position = 'absolute';
-    labelRenderer.current.domElement.style.top = '0px';
-    labelRenderer.current.domElement.style.pointerEvents = 'none';
-    mount.appendChild(labelRenderer.current.domElement);
-
-    // Initialize Camera
-    cameraRef.current = new THREE.PerspectiveCamera(60, width / height, 0.1, 5000);
-    cameraRef.current.up.set(0, 0, 1);
-
-    // Orbit Controls
-    const controls = new OrbitControls(cameraRef.current, renderer.current.domElement);
-    //const controls = new OrbitControls(cameraRef.current, labelRenderer.current.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.25;
-    controls.screenSpacePanning = true;
-    controlsRef.current = controls;
-
-    // Handle Resize
-    const handleResize = () => {
-      renderer.current.setSize(mount.clientWidth, mount.clientHeight);
-      labelRenderer.current.setSize(mount.clientWidth, mount.clientHeight);
-      cameraRef.current.aspect = mount.clientWidth / mount.clientHeight;
-      cameraRef.current.updateProjectionMatrix();
-      controlsRef.current.update();
-    };
-    window.addEventListener("resize", handleResize);
-    
-    // Animation loop
-    const animate = () => {
-      // render
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.current.render(scene.current, cameraRef.current);
-      labelRenderer.current.render(scene.current, cameraRef.current);
-    };
-    animate();
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      mount.removeChild(renderer.current.domElement);
-      controls.dispose();
-    };
-  }, []);
-  
-  // handle site from URL
-  const params = useParams();
-  const site = index.current.synonyms[currentSite];
-  useEffect(()=>{
-    if (!controlsRef || !cameraRef || nostream) return; //nothing to do here
-    if (params.site === currentSite) return; //nothing to do here
-    const site = index.current.synonyms[params.site];
-    if (site in index.current.sites){
-      if (index.current.sites[site].view) {
-        if (attrs && densePoints.current
-                  && points && index.current.sites[site].view.style){
-          colourise(densePoints.current, points, 
-                    attrs.stylesheet, index.current.sites[site].view.style);
-          prevRGB.current = densePoints.current.geometry.attributes.color.clone();
-          setActiveStyle(index.current.sites[site].style);
-        }
-        if (index.current.sites[site].view.tgt){
-          const center = new THREE.Vector3(...index.current.sites[site].view.tgt);
-          cameraRef.current.position.set(...index.current.sites[site].view.pos);
-          cameraRef.current.lookAt(center);
-          controlsRef.current.target.copy(center);
-          controlsRef.current.update();
-        }
-    }}
-    setCurrentSite(params.site); // store that this is the current scene so we don't redraw unecessarily
-  },[params, currentSite]);
-
-  // Handle click and key events
-  useEffect(() => {
-    if (!renderer || !cameraRef || nostream) return;
-
-    const getIntersects = ( event ) => {
-      const rect = renderer.current.domElement.getBoundingClientRect();
-      const mouse = new THREE.Vector2(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        -((event.clientY - rect.top) / rect.height) * 2 + 1
-      )
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(mouse, cameraRef.current);
-      raycaster.params.Points.threshold = attrs.resolution || 0.1; // point size for picking
-      return raycaster.intersectObjects(scene.current.children, true)
-    }
-
-    const handleSingleClick = (event) => {
-      if (!event.shiftKey) return; // Only if Shift is held
-      const intersects = getIntersects(event);
-      if (intersects.length > 0) {
-        const selectedPoint = intersects[0].point.clone();
-        selection.push(selectedPoint)
-        setSelection([ ...selection ]); // update selection
-      }
-    };
-
-    const handleDoubleClick = (event) => {
-      const intersects = getIntersects(event);
-
-      if (intersects.length > 0) {
-        const selectedObject = intersects[0].object; // clicked object
-        const selectedPoint = intersects[0].point;
-        // set center of rotation
-        if (seedPoints.current && (seedPoints.current === selectedObject)) {
-          controlsRef.current.target.copy(selectedPoint);
-          controlsRef.current.update();
-        } else if (densePoints.current && (densePoints.current === selectedObject)) {
-          controlsRef.current.target.copy(selectedPoint);
-          controlsRef.current.update();
-        } else {
-          // remove clicked element from annotations array (based on position)
-          if (selectedObject.userData.annot){
-            ['lines','planes','traces'].forEach( (n) => {
-              annotations[n]=annotations[n].filter( (l) => {
-                return !l.verts[0].equals(selectedObject.userData.annot.verts[0]);
-              });
-            } );
-            setAnnotations({...annotations}); // N.B. this then triggers a redraw that removes the annotation from the scene :-) 
-          }
-        }
-      }
-    };
-    // keydown events
-    const handleKeyDown = (event) => {
-      if (event.key === 'Enter') {
-        const newAnnot = {...annotations};
-
-        // add geometry to annotations
-        if (selection.length === 2) {
-          const v1 = selection[0];
-          const v2 = selection[1];
-          const direction = new THREE.Vector3().subVectors(v2, v1).normalize();
-          let trend = (Math.atan2(direction.x, direction.y) * 180) / Math.PI;
-          let plunge = (Math.asin(direction.z) * 180) / Math.PI;
-          if (plunge < 0){
-            plunge = -plunge;
-            trend = trend - 180; }
-          const distance = v1.distanceTo(v2);
-          newAnnot.lines.push({
-            verts: [v1, v2],
-            color: annotColor,
-            trend: trend < 0 ? trend + 360 : trend,
-            plunge,
-            length: distance,
-          });
-        } else if (selection.length === 3) {
-          const v1 = selection[0];
-          const v2 = selection[1];
-          const v3 = selection[2];
-          const normal = new THREE.Vector3()
-            .crossVectors(new THREE.Vector3().subVectors(v2, v1), new THREE.Vector3().subVectors(v3, v1))
-            .normalize();
-          const dip = (Math.acos(Math.abs(normal.z)) * 180) / Math.PI;
-          let strike = (Math.atan2(normal.x, normal.y) * 180) / Math.PI;
-          if (strike < 0) strike += 360;
-          const dipdir = (strike + 90) % 360;
-          newAnnot.planes.push({
-            verts: [v1, v2, v3],
-            color: annotColor,
-            strike,
-            dip,
-            dipdir,
-          });
-        } else if (selection.length > 3) {
-          let totalLength = 0;
-          for (let i = 0; i < selection.length - 1; i++) {
-            totalLength += selection[i].distanceTo(selection[i + 1]);
-          }
-          newAnnot.traces.push({
-            verts: [...selection],
-            color: annotColor,
-            length: totalLength,
-          });
-        }
-        setAnnotations(newAnnot);
-        setSelection([]); // clear selection
-      } else if (event.key === 'Escape'){
-        setSelection([]); // clear selection
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown, false);
-    renderer.current.domElement.addEventListener("dblclick", handleDoubleClick);
-    renderer.current.domElement.addEventListener("click", handleSingleClick);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      renderer.current.domElement.removeEventListener("dblclick", handleDoubleClick);
-      renderer.current.domElement.removeEventListener("click", handleSingleClick);
-    };
-  }, [selection, attrs]);
-  
   // Load seeds (chunk centers) and draw them
   useEffect(()=> {
-    if (!controlsRef.current || !cameraRef.current || nostream) return;
-    console.log(currentSite);
-    const url = index.current.sites[ currentSite ].mediaURL;
-    if (url === currentMedia) return; // nothing to do here
-    console.log(`Loading cloud from ${url}`);
+    if (!init || nostream ) return;
+
+    // update style according to selected site
+    if (tour.sites[site].view){
+      if (tour.sites[site].view.style) setActiveStyle(tour.sites[site].view.style);
+      if (tour.sites[site].view.group) setGroup(tour.sites[site].view.group);
+    }
+    if (source){
+      // no need to stream if dataset is already loaded! :-) 
+      if (source.store.url === currentMedia) return; 
+    }
+
+    console.log(`Loading cloud for ${site} from from ${currentMedia}`);
     async function loadZarr() {
       try {
         // connect to zarr object
-        const zGroup = await openGroup(new HTTPStore( url )); // dataset
+        const zGroup = await openGroup(new HTTPStore( currentMedia )); // dataset
         const zCenters = await zGroup.getItem("chunk_centers"); // chunk centers array
         const seeds = await zCenters.get([null, null]); // chunk centers data
-        console.log(seeds.shape)
+        console.log(`Cloud containts points with shape ${seeds.shape}`)
         setSource(zGroup); // store zarr group for later access (during streaming)
         setSeeds(seeds); // store seed data
+        console.log(zGroup.store.url);
 
         // get zarr attributes (these contain important metadata)
         const attributes = await zGroup.attrs.asObject();
         setAttrs(attributes); // store these for later :-)
         setActiveStyle(attributes.styles[0]);
+        three.current.origin = attributes.origin; // update origin (not needed, just in case)
+        three.current.pointSize = attributes.resolution; // update point size (very much needed)
+        console.log("Cloud attributes are:");
         console.log(attributes);
 
         // add seed points to scene
@@ -410,48 +195,47 @@ const PointStream = ({ index, annotations, setAnnotations,
         setPoints(new NestedArray(null, [attributes.total,seeds.shape[1]],'<f4'));
         setStreamed({});
         setStreamCount(0);
-        if (seedPoints.current) { scene.current.remove(seedPoints.current); seedPoints.current=null;}
-        if (densePoints.current) { scene.current.remove(densePoints.current); densePoints.current=null;}
+        if (seedPoints.current) { three.current.scene.remove(seedPoints.current); seedPoints.current=null;}
+        if (densePoints.current) { three.current.scene.remove(densePoints.current); densePoints.current=null;}
         const material = new THREE.PointsMaterial({
             size: 2, vertexColors: false, sizeAttenuation: true });
         const points = new THREE.Points(geometry, material);
-        scene.current.add(points);
+        three.current.scene.add(points);
         seedPoints.current = points;
     
         // Adjust Camera
-        const site = params.site;
         let center = new THREE.Vector3();
         let pos;
-        if (site in index.current.sites 
-            && index.current.sites[site].view
-            && index.current.sites[site].view.tgt){
-          center = new THREE.Vector3(...index.current.sites[site].view.tgt);
-          pos = index.current.sites[site].view.pos;
+        if (site in tour.sites 
+            && tour.sites[site].view
+            && tour.sites[site].view.tgt){
+          center = new THREE.Vector3(...tour.sites[site].view.tgt);
+          pos = tour.sites[site].view.pos;
         } else {
           bbox.getCenter(center);
           const size = bbox.getSize(new THREE.Vector3()).length();
           const maxDistance = size * 2;
-          cameraRef.current.far = maxDistance * 5;
+          three.current.camera.far = maxDistance * 5;
           pos = [center.x, center.y-maxDistance/3, center.z+maxDistance/3];
         }
-        cameraRef.current.updateProjectionMatrix();
-        cameraRef.current.position.set(...pos);
-        cameraRef.current.lookAt(center);
-        controlsRef.current.target.copy(center);
-        controlsRef.current.update();
+        three.current.camera.updateProjectionMatrix();
+        three.current.camera.position.set(...pos);
+        three.current.camera.lookAt(center);
+        three.current.controls.target.copy(center);
+        three.current.controls.update();
       } catch (error) {console.error("Error loading Zarr dataset:", error);}
     }
     loadZarr();
-    setCurrentMedia( url );
-  }, [currentSite])
+  }, [site, init, currentMedia])
 
   // **Lazy Loading Closest Chunk**
   useEffect(() => {
-    if (!cameraRef || !seeds || !source || !points || nostream || !seedPoints.current) return;
+    if (!three.current.camera || !seeds || !source || !points || nostream || !seedPoints.current) return;
+    if (!init || nostream || !points ) return;
 
     const loadClosestChunk = async () => {
       const camPos = new THREE.Vector3();
-      cameraRef.current.getWorldPosition(camPos);
+      three.current.camera.getWorldPosition(camPos);
 
       // Find the closest chunk to the screen center (target of view)
       let closestIndex = -1;
@@ -460,7 +244,7 @@ const PointStream = ({ index, annotations, setAnnotations,
       for (let i=0; i<seeds.shape[0]; i++){
         if (streamed[i]) continue; // skip already streamed points
         const worldPos = new THREE.Vector3(xyz.get([i,0]), xyz.get([i,1]), xyz.get([i,2]));
-        const screenPos = worldPos.project(cameraRef.current); // Convert to normalized screen space (-1 to 1)
+        const screenPos = worldPos.project(three.current.camera); // Convert to normalized screen space (-1 to 1)
         const distSq = screenPos.x*screenPos.x + screenPos.y*screenPos.y; // Distance from screen center (0,0)
         if (distSq < closestDistance) {
           closestDistance = distSq;
@@ -488,18 +272,17 @@ const PointStream = ({ index, annotations, setAnnotations,
       // create new point cloud? (this is the first chunk)
       if (!densePoints.current){
         const p = points.get([null, slice(0,3)]).flatten();
-        //const c = points.get([null, slice(3,6)]).flatten();
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute("position", new THREE.Float32BufferAttribute(p, 3));
         geometry.setAttribute("color", new THREE.Float32BufferAttribute(p, 3)); // N.B. this is set to proper colours later
         geometry.setDrawRange( 0, streamCount+chunkData.shape[0] );
 
-        const size = attrs.resolution || 0.1; // Default to 0.1 if missing
+        //const size = attrs.resolution || 0.1; // Default to 0.1 if missing
         //const material = new THREE.PointsMaterial({ 
         //  size: 3.2*size,sizeAttenuation: true, vertexColors: true });
         const material = new THREE.ShaderMaterial({
           uniforms: {
-            worldSize: { value:2000*size } // window.innerHeight / 2 }
+            worldSize: { value:2000*three.current.pointSize } // window.innerHeight / 2 }
           },
           vertexShader: vertexShader,
           fragmentShader: fragmentShader,
@@ -508,9 +291,10 @@ const PointStream = ({ index, annotations, setAnnotations,
         });
 
         const cloud = new THREE.Points(geometry, material);
+        cloud.userData.blockDelete=true;
         colourise( cloud, points, attrs.stylesheet, activeStyle, streamCount); // set colours
         prevRGB.current = cloud.geometry.attributes.color.clone();
-        scene.current.add(cloud);
+        three.current.scene.add(cloud);
         densePoints.current = cloud;
       } else {
         // update existing point cloud (add new points)
@@ -528,7 +312,9 @@ const PointStream = ({ index, annotations, setAnnotations,
       // apply highlights and masks?
       if (group){
         densePoints.current.geometry.attributes.color = prevRGB.current.clone();
-        applyHighlight(densePoints.current, points, attrs.groups[group]);
+        if (group in attrs.groups){
+          applyHighlight(densePoints.current, points, attrs.groups[group]);
+        }
       }
       // sleep a bit to not hog resources, then update everything
       await new Promise(r => setTimeout(r, LOAD_INTERVAL));
@@ -538,131 +324,30 @@ const PointStream = ({ index, annotations, setAnnotations,
     }
     // Load closest chunk; note that this changes the streamCount which triggers a recall
     loadClosestChunk();
-  }, [seeds, points, streamCount, currentMedia]);
+  }, [points, streamCount]);
 
-  // **Add labels **
-  const createLabel = (html, position) => {
-    // add a 3D object
-    const size = attrs.resolution || 0.1; // Default to 0.1 if missing
-    const sphereGeometry = new THREE.SphereGeometry(size*3, 16, 16);
-    const mat = new THREE.MeshBasicMaterial({ color: "#ffffff" });
-    const sphere = new THREE.Mesh(sphereGeometry, mat);
-    sphere.position.copy(position);
-    scene.current.add(sphere);
-    labelRef.current.push(sphere);
+  // ** Changed Style Or Group**
+  useEffect( ()=> {
+      if (!densePoints.current || !attrs || !points) return;
+      if (activeStyle && attrs.stylesheet[activeStyle]){
+        colourise(densePoints.current, points, attrs.stylesheet, activeStyle);
+        prevRGB.current = densePoints.current.geometry.attributes.color.clone();
+      }
+      if (group && attrs.groups[group]){
+        applyHighlight(densePoints.current, points, attrs.groups[group]);
+      }
+      densePoints.current.geometry.attributes.color.needsUpdate = true;
+  }, [activeStyle] );
 
-    // add corresponding 2D (HTML) object
-    const labelDiv = document.createElement( 'div' );
-    labelDiv.className = 'labeldiv';
-    labelDiv.innerHTML = html;
-    const label = new CSS2DObject( labelDiv );
-    label.position.set( 0, 0, 0 );
-    label.center.set( 0, 0 );
-    sphere.add( label );
-  };
-
-  // Create and add html labels
-  useEffect(()=>{
-  if (nostream || (!attrs)){ return };
-    labelRef.current.forEach( (obj) => {
-      scene.current.remove(obj);
-      obj.geometry.dispose();
-      obj.material.dispose();
-      obj.children.forEach( (c) => {obj.remove(c)});
-    } );
-    labelRef.current = [];
-    if (!labelVis) return; // don't draw labels
-    if (index.current.sites) {
-      if (index.current.sites[currentSite]) {
-        if (index.current.sites[currentSite].labels) {
-            Object.keys(index.current.sites[currentSite].labels).forEach( (k) => {
-              const lab = index.current.sites[currentSite].labels[k];
-              const pos = new THREE.Vector3(...lab.pos);
-              pos.sub(new THREE.Vector3(...attrs.origin));
-              createLabel(lab.html, pos);
-            } );
-    }}}
-  },[currentSite, nostream, attrs, labelVis]);
-
-  // ** Draw annotations **
-  useEffect(()=>{
-    if (nostream) return;
-
-    // clear annotations
-    [spheresRef, lineRef, planeRef].forEach( (ref)=>{
-      ref.current.forEach((obj) => {
-        scene.current.remove(obj);
-        obj.geometry.dispose();
-        obj.material.dispose();
-    })});
-    spheresRef.current = [];
-    if (!annotVis) return; // don't draw annotations
-
-    // Add a yellow sphere to highlight selected points
-    if (attrs){
-      const size = attrs.resolution || 0.1; // Default to 0.1 if missing
-      const sphereGeometry = new THREE.SphereGeometry(size*3, 16, 16);
-      selection.forEach((point)=>{
-        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-        sphere.position.copy(point);
-        scene.current.add(sphere);
-        spheresRef.current.push(sphere);
-      });
+  // ** Changed Group **
+  useEffect( ()=> {
+    if (!densePoints.current || !attrs || !prevRGB.current || !points) return;
+    densePoints.current.geometry.attributes.color = prevRGB.current.clone(); // restore previous colour
+    if (group && attrs.groups[group]){
+      applyHighlight(densePoints.current, points, attrs.groups[group]);
     }
-
-    // add current line, plane or polyline
-    if (selection.length === 2) {
-      drawLine({verts:[selection[0], selection[1]], color:annotColor});
-    } else if (selection.length === 3) {
-      drawPlane({verts:[selection[0], selection[1], selection[2]], color:annotColor});
-    } else if (selection.length > 3){
-      drawLine({verts:selection, color:annotColor});
-    }
-
-    // add annotation lines / planes / polylines
-    annotations.lines.forEach( (l) => { drawLine(l) } );
-    annotations.planes.forEach( (l) => { drawPlane(l) } );
-    annotations.traces.forEach( (l) => { drawLine(l) } );
-  }, [selection, attrs, annotations, annotColor, annotVis]);
-
-  // **Function to Draw a Line Between Two Points**
-  const drawLine = (points) => {
-    if (lineRef.current) scene.current.remove(lineRef.current); // Remove old line if exists
-    const geometry = new LineGeometry();//.setFromPoints([point1, point2]);
-    const v = [];
-    points.verts.forEach( (p) => {v.push(p.x);v.push(p.y);v.push(p.z);} );
-		geometry.setPositions(v);
-    const colour = points.color ? points.color : 0xffff00;
-    const lineMaterial = new LineMaterial({ color: colour, linewidth: 5, vertexColors: false });
-    const line = new Line2(geometry, lineMaterial);
-    line.userData = {annot:points};
-    scene.current.add(line);
-    lineRef.current.push(line);
-  };
-  
-  // **Function to Draw a Plane Defined by Three Points**
-  const drawPlane = (points) => {
-    // compute plane orientation
-    if (planeRef.current) scene.current.remove(planeRef.current); // Remove old plane if exists
-    const colour = points.color ? points.color : 0xffff00;
-    const material = new THREE.MeshBasicMaterial({ color: colour, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
-    const normal = new THREE.Vector3(); // Compute normal for plane orientation
-    const [point1, point2, point3] = points.verts;
-    const v1 = new THREE.Vector3().subVectors(point2, point1);
-    const v2 = new THREE.Vector3().subVectors(point3, point1);
-    normal.crossVectors(v1, v2).normalize();
-    
-    // add disk
-    const geometry = new THREE.CircleGeometry( Math.max(v1.length(), v2.length())/2, 32 ); 
-    const plane = new THREE.Mesh(geometry, material); // Set plane orientation
-    plane.position.copy(new THREE.Vector3().addVectors(point1, point2).add(point3).divideScalar(3));
-    const quaternion = new THREE.Quaternion();
-    quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
-    plane.setRotationFromQuaternion(quaternion);
-    plane.userData = {annot:points}; // needed to flag when objects are deleted
-    scene.current.add(plane);
-    planeRef.current.push(plane);
-  };
+    densePoints.current.geometry.attributes.color.needsUpdate = true;
+  }, [group] );
 
   let buttons = <></>
   let buttons2 = <></>
@@ -670,54 +355,33 @@ const PointStream = ({ index, annotations, setAnnotations,
     buttons = attrs.styles.map((k) => {
       return <button
       className={`button ${activeStyle === k ? 'active' : ''}`}
-      onClick={() => {
-                      colourise(densePoints.current, points, attrs.stylesheet, k);
-                      prevRGB.current = densePoints.current.geometry.attributes.color.clone();
-                      setActiveStyle(k);  
-                      setGroup(null); }}
+      onClick={() => { setActiveStyle(k); }}
       key={k}> {k} </button>
     });
-    buttons.push(<input
-      type="color"
-      key="cols"
-      value={annotColor}
-      onChange={(e)=>{setAnnotColor(e.target.value)}}
-      style={{ width: '36px', height: '26px',
-        border: 'none', padding: '0', background: 'none', cursor: 'pointer' }}
-    />);
     if (attrs.groups){
       buttons2 = Object.keys(attrs.groups).map((k) => {
         return <button
         className={`button ${group === k ? 'active' : ''}`}
         onClick={() => {if (group === k){ // turn highlight off
                           setGroup(null);
-                          densePoints.current.geometry.attributes.color = prevRGB.current.clone();
-                          densePoints.current.geometry.attributes.color.needsUpdate = true;
                         } else { // turn highlight on
-                          densePoints.current.geometry.attributes.color = prevRGB.current.clone();
                           setGroup(k);
-                          applyHighlight(densePoints.current, points, attrs.groups[k]); }
-                        }}
+                        }}}
         key={k}> {k} </button>
       });
     }
   }
-  if (nostream) return <div className="viewer" ref={mountRef} style={{ height: "100%", width: "100%" }} />
+  if (nostream) return <div id="cloud"></div>;
   
   //attributes
   return (
-    <div style={{ height: "100vh", width: "100vw", position: "relative" }}>
-      <div className="buttons">
+      <div className="topbuttons">
         <div className="row">
           { buttons }
         </div>
-        <div className="row2">
+        <div className="row">
           { buttons2 }
-          <button className={`button ${labelVis ? 'active' : ''}`} onClick={() => { setLabelVis(!labelVis)}}>Labels</button>
-          <button className={`button ${annotVis ? 'active' : ''}`} onClick={() => { setAnnotVis(!annotVis)}}>Annotations</button>
         </div>
-      </div>
-      <div className="viewer" ref={mountRef} style={{ height: "100%", width: "100%" }} />
       </div>
   );
 };

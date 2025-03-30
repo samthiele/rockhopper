@@ -3,17 +3,17 @@
   "name": "Rock Hopper Virtual Field Trips",
   "icons": [
     {
-      "src": "hopper_64.png",
+      "src": "icon/hopper_64.png",
       "type": "image/png",
       "sizes": "64x64"
     },
     {
-      "src": "hopper_128.png",
+      "src": "icon/hopper_128.png",
       "type": "image/png",
       "sizes": "128x128"
     },
     {
-      "src": "hopper_256.png",
+      "src": "icon/hopper_256.png",
       "type": "image/png",
       "sizes": "256x256"
     }

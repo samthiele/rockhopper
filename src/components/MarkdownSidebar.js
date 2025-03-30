@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm'
 import './MarkdownSidebar.css';
@@ -56,12 +55,11 @@ const scrollToHeading = (id) => {
   }
 };
 
-const MarkdownSidebar = ({index, annotations, setAnnotations,
-                          scene, renderer, cameraRef, controlsRef}) => {
+const MarkdownSidebar = ({tour, site, annotations, setAnnotations,
+                          three}) => {
   const [activeTab, setActiveTab] = useState('guide'); // visible tab
   const [activeLanguage, setLanguage] = useState(0); // active language
   const [markdown, setMarkdown] = useState(null); // loaded .md files
-  const currentSite = useState('start');
   const [content, setContent] = useState(''); // md content to draw
   const cache = useRef({}); // md cache to allow edits
   const [editedContent, setEditedContent] = useState('');
@@ -71,15 +69,7 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
   
   // load md files
   let tabs;
-  const params = useParams();
-  if (params.site in index.current.synonyms){
-    tabs = {...index.current.sites[ index.current.synonyms[params.site] ].tabs, ...index.current.tabs};
-    currentSite.current = index.current.synonyms[params.site];
-  } else if (currentSite.current) {
-    tabs = {...index.current.sites[ index.current.synonyms[currentSite.current] ].tabs, ...index.current.tabs};
-  } else {
-    tabs = {...index.current.tabs};
-  }
+  tabs = {...tour.sites[ site ].tabs, ...tour.tabs};
   useEffect(() => {
     async function loadMD(){
       const mdown = {...markdown}; // put fetched markdown here
@@ -94,13 +84,13 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
       if (activeTab.toLowerCase() in mdown){
         setContent( mdown[activeTab.toLowerCase()].text );
       } else{
-        const t = Object.keys(index.current.tabs)[0];
+        const t = Object.keys(tour.tabs)[0];
         setContent( mdown[t.toLowerCase()].text );
         setActiveTab(t.toLowerCase());
       }
     }
     loadMD();
-    }, [params, activeLanguage]); // depends on selected language!
+    }, [site, activeLanguage]); // depends on selected language!
 
     // Scroll to heading if URL contains a hash
     useEffect(() => {
@@ -156,28 +146,28 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
             className="markdown"
             remarkPlugins={[remarkGfm]}
             components={{
-              p: props => <div {...props} />,
+              p: props => <div {...props} className='markdownParagraph'/>,
               h2: ({ node, children }) => { // set ID to allow scrolling to heading
                 if (children.type === 'a'){
                   let id = children.props.children.toLowerCase().replace(/\s+/g, '');
-                  if (id in index.current.synonyms) id = index.current.synonyms[id]; // translate possibly
+                  if (id in tour.synonyms) id = tour.synonyms[id]; // translate possibly
                   const url = children.props.href;
                   return <h2 id={id}><a href={url}>{children}</a></h2>;
                 } else {
                   let id = children.toLowerCase().replace(/\s+/g, '');
-                  if (id in index.current.synonyms) id = index.current.synonyms[id]; // translate possibly
+                  if (id in tour.synonyms) id = tour.synonyms[id]; // translate possibly
                   return <h2 id={id}>{children}</h2>;
                 }
               },
               h3: ({ node, children }) => { // set ID to allow scrolling to heading
                 if (children.type === 'a'){
                   let id = children.props.children.toLowerCase().replace(/\s+/g, '');
-                  if (id in index.current.synonyms) id = index.current.synonyms[id]; // translate possibly
+                  if (id in tour.synonyms) id = tour.synonyms[id]; // translate possibly
                   const url = children.props.href;
                   return <h2 id={id}><a href={url}>{children}</a></h2>;
                 } else {
                   let id = children.toLowerCase().replace(/\s+/g, '');
-                  if (id in index.current.synonyms) id = index.current.synonyms[id]; // translate possibly
+                  if (id in tour.synonyms) id = tour.synonyms[id]; // translate possibly
                   return <h2 id={id}>{children}</h2>;
                 }
               },
@@ -258,18 +248,16 @@ const MarkdownSidebar = ({index, annotations, setAnnotations,
         </ReactMarkdown></>)}
       </div>
       <div className="lbar">
-        {Object.entries(index.current.languages).map(([i,v]) => {
+        {Object.entries(tour.languages).map(([i,v]) => {
           return <button className={`lbutton ${activeLanguage==i?'active':''}`}
                          onClick={() => {setLanguage(i)}}
                          key={i}> {v} </button>
         })}
         -
         <button className="lbutton" 
-                onClick={() => {console.log("todo")}}>Add Stop</button>
+                onClick={() => {console.log("todo")}}>Set View</button>
         <button className="lbutton" 
-                onClick={() => {console.log("todo")}}>⬇ MD</button>
-        <button className="lbutton" 
-                onClick={() => {console.log("todo")}}>⬇ Cloud</button>
+                onClick={() => {console.log("todo")}}>⬇ Notes</button>
       </div>
     </div>
   );
