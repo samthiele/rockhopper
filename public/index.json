@@ -8,6 +8,7 @@
         "site1":{
             "tabs":{"Guide":[ "./md/guide_en.md", "./md/guide_de.md" ]},
             "mediaType": "cloud",
+            "pointSize":0.1,
             "mediaURL": "https://storage.googleapis.com/rockhopper/dolomites.zarr",
             "view":{"pos":[ 80, -15, 27 ], "tgt":[ 54, 48, -16 ], "style" : "rgb", "group":"none"},
             "labels":{"site2":{"pos":[76,47,-29], "html":"<a href='./#/site2'>View Site 2</a>"},
@@ -18,6 +19,7 @@
         "site2":{
             "tabs":{"Guide":[ "./md/guide_en.md", "./md/guide_de.md" ]},
             "mediaType": "cloud",
+            "pointSize":0.1,
             "mediaURL": "https://storage.googleapis.com/rockhopper/dolomites.zarr",
             "view":{"pos":[-79, -132, 40], "tgt":[-91, -81, 24], "style":"carbonate", "group":"dolomite"},
             "labels":{"site1":{ "pos":[-99,-99,19], "html":"<a href='./#/site1'>View Site 1</a>"}}
@@ -32,6 +34,7 @@
         "site4":{
             "tabs":{"Guide":[ "./md/guide_en.md", "./md/guide_de.md" ]},
             "mediaType":"cloud",
+            "pointSize":10,
             "mediaURL":"https://storage.googleapis.com/rockhopper/LaPalma.zarr",
             "labels":{"outcrop":{"pos":[1725, -15143, 1919], "html":"<a href='./#/site1'>Back to the mountains</a>"}}
         }

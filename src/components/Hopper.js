@@ -8,22 +8,52 @@ import PointStream from './PointStream'
 import PhotosphereViewer from './Photosphere'
 import './Hopper.css'
 
+// fetch annotation JSON files
+const fetchAnnotation = async (url) => {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
+        }
+        const jsonData = await response.json(); // Parse the JSON response
+        return jsonData; // Return the JavaScript object
+    } catch (error) {
+        console.error('Error fetching JSON:', error);
+        return null; // Return null or an empty object in case of an error
+    }
+};
 
 const Hopper = ({tour}) => {
     const three = useRef({pointSize: 0.1}); // three.js objects
-    const [annotations, setAnnotations] = useState({lines:[], planes:[], traces:[]});
+    const [annotations, setAnnotations] = useState({});
     const [init, setInit] = useState(false);
     const [site, setSite] = useState('');
     const [currentMedia, setCurrentMedia] = useState(null); // current media we are connected to
     const [fixCamera, setFixedCamera] = useState(false);
 
+    // set current site
     const params = useParams();
     useEffect( ()=>{
         if ((!params.site in tour.synonyms)) return;
 
-        // set site
+        // parse site
         const newSite = tour.synonyms[params.site];
+
+        // fetch or create annotation JSON (if it does not already exist)
+        if (!annotations[newSite]) {
+            if (tour.sites[newSite].annotURL){
+                // fetch from specified URL
+                const annot =  fetchAnnotation(tour.sites[newSite].annotURL);
+            } else {
+                // initialise an empty annotation
+                annotations[newSite] = {lines:[], planes:[], traces:[]}
+                setAnnotations({...annotations}); // update
+            }
+        }
+        // update site
         setSite(newSite);
+
+        // update camera etc.
         if (newSite in tour.sites){
             if (tour.sites[newSite].view){
                 if (three.current.camera){
@@ -57,8 +87,8 @@ const Hopper = ({tour}) => {
     }
     const mediaType = tour.sites[site].mediaType;
 
+    // define media that will be displayed
     let media = <></>
-    let fixedCam = false;
     if (mediaType === 'photosphere') {
         media = <PhotosphereViewer  
                     tour={tour}  site={site} three={three}
@@ -68,7 +98,7 @@ const Hopper = ({tour}) => {
                         currentMedia={currentMedia} init={init} key={"ps"}/>
     }
 
-    // return
+    // return splitscreen with markdown (left) and 3D view (right)
     return (
             <div className="app">
             <SplitScreen left={[<MarkdownSidebar tour={tour} 

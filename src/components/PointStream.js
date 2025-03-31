@@ -179,7 +179,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         setAttrs(attributes); // store these for later :-)
         setActiveStyle(attributes.styles[0]);
         three.current.origin = attributes.origin; // update origin (not needed, just in case)
-        three.current.pointSize = attributes.resolution; // update point size (very much needed)
+        three.current.pointSize =  tour.sites[site].pointSize || attributes.resolution; // update point size (very much needed)
         console.log("Cloud attributes are:");
         console.log(attributes);
 

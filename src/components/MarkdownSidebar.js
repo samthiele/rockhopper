@@ -244,7 +244,7 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations,
               }
             }} 
         >
-          {content + ((activeTab.toLowerCase()==='notebook')?annotToMD(annotations):"")}
+          {content + ((activeTab.toLowerCase()==='notebook')?annotToMD(annotations[site]):"")}
         </ReactMarkdown></>)}
       </div>
       <div className="lbar">

@@ -84,7 +84,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             three.current.controls.update();
         };
         window.addEventListener("resize", handleResize);
-        
+                
         // setup complete!
         console.log("Setup three.js scene.");
         setInit(true);
@@ -114,6 +114,11 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 three.current.scene.remove(three.current.scene.children[i]); 
             }
         }
+        setSelection([]);
+        // clear any (accidentally) remaining labels
+        document.querySelectorAll('.outerdiv').forEach( (l)=>{
+            l.innerHTML = '';
+        });
     }, [currentMedia]);
     
     // SETUP PICKING
@@ -159,7 +164,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 // remove clicked element from annotations array (based on position)
                 if (selectedObject.userData.annot){
                 ['lines','planes','traces'].forEach( (n) => {
-                    annotations[n]=annotations[n].filter( (l) => {
+                    annotations[site][n]=annotations[site][n].filter( (l) => {
                     return !l.verts[0].equals(selectedObject.userData.annot.verts[0]);
                     });
                 } );
@@ -198,7 +203,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 plunge = -plunge;
                 trend = trend - 180; }
                 const distance = v1.distanceTo(v2);
-                newAnnot.lines.push({
+                newAnnot[site].lines.push({
                 verts: [v1, v2],
                 color: annotColor,
                 trend: trend < 0 ? trend + 360 : trend,
@@ -216,7 +221,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 let strike = (Math.atan2(normal.x, normal.y) * 180) / Math.PI;
                 if (strike < 0) strike += 360;
                 const dipdir = (strike + 90) % 360;
-                newAnnot.planes.push({
+                newAnnot[site].planes.push({
                 verts: [v1, v2, v3],
                 color: annotColor,
                 strike,
@@ -228,7 +233,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 for (let i = 0; i < selection.length - 1; i++) {
                 totalLength += selection[i].distanceTo(selection[i + 1]);
                 }
-                newAnnot.traces.push({
+                newAnnot[site].traces.push({
                 verts: [...selection],
                 color: annotColor,
                 length: totalLength,
@@ -308,9 +313,9 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         }
     
         // add annotation lines / planes / polylines
-        annotations.lines.forEach( (l) => { drawLine(l) } );
-        annotations.planes.forEach( (l) => { drawPlane(l) } );
-        annotations.traces.forEach( (l) => { drawLine(l) } );
+        annotations[site].lines.forEach( (l) => { drawLine(l) } );
+        annotations[site].planes.forEach( (l) => { drawPlane(l) } );
+        annotations[site].traces.forEach( (l) => { drawLine(l) } );
       }, [site, init, selection, annotations, annotColor, annotVis]);
     
     // **Add labels **
