@@ -46,10 +46,11 @@ const Hopper = ({tour}) => {
                 const annot =  fetchAnnotation(tour.sites[newSite].annotURL);
             } else {
                 // initialise an empty annotation
-                annotations[newSite] = {lines:[], planes:[], traces:[]}
+                annotations[newSite] = {lines:[], planes:[], traces:[]};
                 setAnnotations({...annotations}); // update
             }
         }
+        
         // update site
         setSite(newSite);
 
@@ -104,7 +105,6 @@ const Hopper = ({tour}) => {
             <SplitScreen left={[<MarkdownSidebar tour={tour} 
                                                  site={site}
                                                  annotations={annotations}
-                                                 setAnnotations={setAnnotations}
                                                  three={three}
                                                  key={"md"}/>] } 
                         right={[<>

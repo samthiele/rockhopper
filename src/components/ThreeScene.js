@@ -9,6 +9,22 @@ import './ThreeScene.css';
 
 const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 
+const download = (text, filename, type) => {
+    // build a blob ready to download
+    const blob = new Blob([text], { type: type }); // Create a Blob from the JSON string
+    const url = URL.createObjectURL(blob); // Create a URL for the Blob
+
+    // Create a temporary anchor element to trigger the download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename; // Set the file name
+    document.body.appendChild(a); // Append the anchor to the body
+    a.click(); // Programmatically click the anchor to start the download
+    document.body.removeChild(a); // Remove the anchor from the body
+
+    // Revoke the object URL to free up memory
+    URL.revokeObjectURL(url);
+}
 const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                         fixCamera, init, setInit, currentMedia }) => {
     const mountRef = useRef(null);
@@ -182,16 +198,16 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             // add geometry to annotations
             if (selection.length === 1) {
                 let txt = prompt("Enter label (text or html)").trim();
-                //if (txt[0] != '<') txt = `<p>${txt}</p>`;
-                const label = {html: txt, pos: selection[0]}
-                if (tour.sites[site].labels) {
-                    const n = Object.keys(tour.sites[site].labels).length;
-                    tour.sites[site].labels[`label${n+1}`] = label;
-                } else {
-                    tour.sites[site].labels = {label1:label};
+                if (txt.length > 0) {
+                    const label = {html: txt, pos: selection[0]}
+                    if (tour.sites[site].labels) {
+                        const n = Object.keys(tour.sites[site].labels).length;
+                        tour.sites[site].labels[`label${n+1}`] = label;
+                    } else {
+                        tour.sites[site].labels = {label1:label};
+                    }
+                    drawLabel(txt, new THREE.Vector3(...selection[0]));
                 }
-                console.log(selection[0]);
-                drawLabel(txt, new THREE.Vector3(...selection[0]));
             }
             else if (selection.length === 2) {
                 const v1 = selection[0];
@@ -258,7 +274,6 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
     // Create and add html labels
     useEffect(()=>{
         if (!init) return;
-        console.log("deleting labels");
 
         // clear previous labels
         labelRef.current.forEach( (obj) => {
@@ -272,7 +287,6 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
 
         // add labels
         if (tour.sites[site].labels) {
-            console.log("adding labels");
             Object.keys(tour.sites[site].labels).forEach( (k) => {
                 const lab = tour.sites[site].labels[k];
                 drawLabel(lab.html, new THREE.Vector3(...lab.pos));
@@ -387,20 +401,44 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             <div className="bottombuttons">
                 <div className="row">
                     <button className="button" onClick={() => {
-                        const p = [three.current.camera.position.x, 
-                                    three.current.camera.position.y, 
-                                    three.current.camera.position.z];
-                        const t = [three.current.controls.target.x, 
-                                   three.current.controls.target.y, 
-                                   three.current.controls.target.z];
-                        console.log({ pos: p, tgt: t});
-                    }}>⬇ Annotations</button>
-                    <button className="button" onClick={() => {console.log("todo")}}>⬇ Cloud</button>
+                        // download annotations
+                        const annotationsJSON = JSON.stringify(annotations, null, 2); // Convert annotations to JSON string
+                        download( annotationsJSON, 'annotations.json', 'applications/json'); 
+                        }}>Annotations ⬇</button>
+                    <input type="file" accept=".json" onChange={(event) => {
+                            const file = event.target.files[0]; // Get the uploaded file
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    try {
+                                        const annotations = JSON.parse(e.target.result); // Parse the JSON file
+                                        if (!(site in annotations)){
+                                            annotations[site] = {lines:[], planes:[], traces:[]};
+                                        }
+                                        setAnnotations(annotations); // Set the annotations state
+                                        setSelection([]); // clear selection
+                                    } catch (error) {
+                                        console.error('Error parsing uploaded JSON file:', error);
+                                    }
+                                };
+                                reader.readAsText(file); // Read the file as text
+                            }
+                        }}
+                        style={{ display: 'none' }} // Hide the file input
+                        id="upload-annotations"
+                    />
+                    <button
+                        className="button"
+                        onClick={() => { document.getElementById('upload-annotations').click(); }}>
+                        ⬆
+                    </button>
+
                     <button className={`button ${labelVis ? 'active' : ''}`} onClick={() => { setLabelVis(!labelVis)}}>Labels</button>
                     <button className={`button ${annotVis ? 'active' : ''}`} onClick={() => { setAnnotVis(!annotVis)}}>Annotations</button>
                     <input type="color" key="cols" value={annotColor} onChange={(e)=>{setAnnotColor(e.target.value)}} 
                             style={{ width: '36px', height: '26px', border: 'none', padding: '0', background: 'none', cursor: 'pointer' }}/>
                 </div>
+
             </div>
             <div className="viewer" ref={mountRef} style={{ height: "100%", width: "100%"}} />
             </div>);

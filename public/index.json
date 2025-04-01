@@ -4,6 +4,7 @@
     "tabs":{ "Notebook":[ "./md/notes_en.md", "./md/notes_de.md" ],
              "References":[ "./md/references_en.md", "./md/references_de.md" ],
              "Help":[ "./md/help_en.md","./md/help_de.md"]},
+    "annotations":"",
     "sites":{
         "site1":{
             "tabs":{"Guide":[ "./md/guide_en.md", "./md/guide_de.md" ]},

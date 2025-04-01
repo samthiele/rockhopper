@@ -55,8 +55,7 @@ const scrollToHeading = (id) => {
   }
 };
 
-const MarkdownSidebar = ({tour, site, annotations, setAnnotations,
-                          three}) => {
+const MarkdownSidebar = ({tour, site, annotations, three}) => {
   const [activeTab, setActiveTab] = useState('guide'); // visible tab
   const [activeLanguage, setLanguage] = useState(0); // active language
   const [markdown, setMarkdown] = useState(null); // loaded .md files
@@ -254,10 +253,54 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations,
                          key={i}> {v} </button>
         })}
         -
-        <button className="lbutton" 
-                onClick={() => {console.log("todo")}}>Set View</button>
-        <button className="lbutton" 
-                onClick={() => {console.log("todo")}}>⬇ Notes</button>
+        <button className="lbutton" onClick={() => {
+                  const v = tour.sites[site].view || {};
+                  v.pos = [three.current.camera.position.x, 
+                            three.current.camera.position.y, 
+                            three.current.camera.position.z];
+                  v.tgt = [three.current.controls.target.x, 
+                            three.current.controls.target.y, 
+                            three.current.controls.target.z];
+                  v.
+                  tour.sites[site].view = v;
+              }}> Set View </button>
+        <button className="lbutton" onClick={() => {
+              // Create a Blob from the markdown content
+              const blob = new Blob([content], { type: 'text/markdown' });
+              const url = URL.createObjectURL(blob); // Create a URL for the Blob
+
+              // Create a temporary anchor element to trigger the download
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'notes.md'; // Set the file name
+              document.body.appendChild(a); // Append the anchor to the body
+              a.click(); // Programmatically click the anchor to start the download
+              document.body.removeChild(a); // Remove the anchor from the body
+
+              // Revoke the object URL to free up memory
+              URL.revokeObjectURL(url);
+          }} > Notes ⬇ </button>
+          <input type="file" accept=".md" onChange={(event) => {
+                  const file = event.target.files[0]; // Get the uploaded file
+                  if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (e) => {
+                          const markdownContent = e.target.result; // Get the file content as text
+                          const url = tabs['Notebook'][activeLanguage];
+                          cache.current[url] = markdownContent; // update cached md file
+                          setMarkdown({...markdown, notebook:{text: markdownContent}});
+                          setActiveTab('Notebook');
+                          setContent(markdownContent);
+                      };
+                      reader.readAsText(file); // Read the file as text
+                  }
+              }}
+              style={{ display: 'none' }} // Hide the file input
+              id="upload-markdown"/>
+          <button className="lbutton" onClick={() => { document.getElementById('upload-markdown').click(); }} >
+              ⬆
+          </button>
+
       </div>
     </div>
   );

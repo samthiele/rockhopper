@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from 'react-router-dom';
 import * as THREE from "three";
+import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { openGroup, HTTPStore, slice, NestedArray } from "zarr";
 import chroma from 'chroma-js';
 import './ThreeScene.css';
@@ -144,7 +145,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
   const [streamCount, setStreamCount] = useState(0); // number of points already streamed
 
   // styling
-  const [group, setGroup] = useState(null); // selected highlights
+  const [activeGroup, setActiveGroup] = useState(null); // selected highlights
   const prevRGB = useRef(null); // used for turning highlight off quickly
   const [activeStyle, setActiveStyle] = useState(null);
 
@@ -155,7 +156,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
     // update style according to selected site
     if (tour.sites[site].view){
       if (tour.sites[site].view.style) setActiveStyle(tour.sites[site].view.style);
-      if (tour.sites[site].view.group) setGroup(tour.sites[site].view.group);
+      if (tour.sites[site].view.group) setActiveGroup(tour.sites[site].view.group);
     }
     if (source){
       // no need to stream if dataset is already loaded! :-) 
@@ -310,10 +311,10 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
       }
       
       // apply highlights and masks?
-      if (group){
+      if (activeGroup){
         densePoints.current.geometry.attributes.color = prevRGB.current.clone();
-        if (group in attrs.groups){
-          applyHighlight(densePoints.current, points, attrs.groups[group]);
+        if (activeGroup in attrs.groups){
+          applyHighlight(densePoints.current, points, attrs.groups[activeGroup]);
         }
       }
       // sleep a bit to not hog resources, then update everything
@@ -333,8 +334,8 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         colourise(densePoints.current, points, attrs.stylesheet, activeStyle);
         prevRGB.current = densePoints.current.geometry.attributes.color.clone();
       }
-      if (group && attrs.groups[group]){
-        applyHighlight(densePoints.current, points, attrs.groups[group]);
+      if (activeGroup && attrs.groups[activeGroup]){
+        applyHighlight(densePoints.current, points, attrs.groups[activeGroup]);
       }
       densePoints.current.geometry.attributes.color.needsUpdate = true;
   }, [activeStyle] );
@@ -343,11 +344,11 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
   useEffect( ()=> {
     if (!densePoints.current || !attrs || !prevRGB.current || !points) return;
     densePoints.current.geometry.attributes.color = prevRGB.current.clone(); // restore previous colour
-    if (group && attrs.groups[group]){
-      applyHighlight(densePoints.current, points, attrs.groups[group]);
+    if (activeGroup && attrs.groups[activeGroup]){
+      applyHighlight(densePoints.current, points, attrs.groups[activeGroup]);
     }
     densePoints.current.geometry.attributes.color.needsUpdate = true;
-  }, [group] );
+  }, [activeGroup] );
 
   let buttons = <></>
   let buttons2 = <></>
@@ -361,11 +362,11 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
     if (attrs.groups){
       buttons2 = Object.keys(attrs.groups).map((k) => {
         return <button
-        className={`button ${group === k ? 'active' : ''}`}
-        onClick={() => {if (group === k){ // turn highlight off
-                          setGroup(null);
+        className={`button ${activeGroup === k ? 'active' : ''}`}
+        onClick={() => {if (activeGroup === k){ // turn highlight off
+                          setActiveGroup(null);
                         } else { // turn highlight on
-                          setGroup(k);
+                          setActiveGroup(k);
                         }}}
         key={k}> {k} </button>
       });
@@ -382,6 +383,36 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         <div className="row">
           { buttons2 }
         </div>
+        {(points && (streamCount == points.shape[0])) ? <div className="row">
+          <button className="button" onClick={() => {
+              const points = densePoints.current;
+              const positions = points.geometry.attributes.position.array;
+              const colors = points.geometry.attributes.color.array;
+
+              // Create the CSV file
+              let csv = 'x,y,z,r,g,b\n';
+              for (let i = 0; i < positions.length; i += 3) {
+                  const x = positions[i] + attrs.origin[0];
+                  const y = positions[i + 1] + attrs.origin[1];
+                  const z = positions[i + 2] + attrs.origin[2];
+                  const r = Math.floor( colors[i]*255 );
+                  const g = Math.floor( colors[i + 1]*255 );
+                  const b = Math.floor( colors[i + 2]*255 );
+                  csv += `${x},${y},${z},${r},${g},${b}\n`;
+              }
+
+              // Download
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'points.csv'; // Set the file name
+              document.body.appendChild(a); // Append the anchor to the body
+              a.click(); // Programmatically click the anchor to start the download
+              document.body.removeChild(a); // Remove the anchor from the body
+              URL.revokeObjectURL(url);
+          }}>Cloud ⬇</button>
+        </div>:<></>}
       </div>
   );
 };
