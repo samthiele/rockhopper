@@ -102,7 +102,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         window.addEventListener("resize", handleResize);
                 
         // setup complete!
-        console.log("Setup three.js scene.");
+        console.log("Three.js setup complete.");
         setInit(true);
 
         // Animation loop
@@ -177,11 +177,16 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                     three.current.controls.update();
                 }
             } else { // otherwise, delete this object
+                if (!annotations) return;
+
                 // remove clicked element from annotations array (based on position)
                 if (selectedObject.userData.annot){
                 ['lines','planes','traces'].forEach( (n) => {
                     annotations[site][n]=annotations[site][n].filter( (l) => {
-                    return !l.verts[0].equals(selectedObject.userData.annot.verts[0]);
+                    const v = l.verts[0];
+                    const v2 = selectedObject.userData.annot.verts[0];
+                    return !((v.x == v2.x) && (v.y == v2.y) && (v.z == v2.z));
+                    //return !l.verts[0].equals(selectedObject.userData.annot.verts[0]);
                     });
                 } );
                 setAnnotations({...annotations}); // N.B. this then triggers a redraw that removes the annotation from the scene :-) 
@@ -194,19 +199,36 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         const handleKeyDown = (event) => {
             if (event.key === 'Enter') {
             const newAnnot = {...annotations};
-
+            if (!(site in newAnnot)){
+                newAnnot[site] = {lines:[], planes:[], traces:[]};
+            }
             // add geometry to annotations
             if (selection.length === 1) {
                 let txt = prompt("Enter label (text or html)").trim();
                 if (txt.length > 0) {
-                    const label = {html: txt, pos: selection[0]}
+                    const label = {html: txt, pos:[selection[0].x,
+                                           selection[0].y,selection[0].z]}
+                    
+                    let k = 'label1';
                     if (tour.sites[site].labels) {
                         const n = Object.keys(tour.sites[site].labels).length;
-                        tour.sites[site].labels[`label${n+1}`] = label;
-                    } else {
-                        tour.sites[site].labels = {label1:label};
+                        k = `label${n+1}`;
                     }
-                    drawLabel(txt, new THREE.Vector3(...selection[0]));
+                    if (!tour.sites[site].labels) tour.sites[site].labels = {};
+                    tour.sites[site].labels[k] = label;
+                    drawLabel(txt, new THREE.Vector3(...selection[0]), k);
+
+                    // send a POST that updates JSON file
+                    if (tour.devURL){
+                        fetch("./update", {
+                        method : 'POST', 
+                        headers : { 'Content-Type':'application/json; charset=utf-8'},
+                        body: JSON.stringify(
+                            {filename: "./index.json",
+                            content: JSON.stringify(tour, null, 2),
+                            })
+                        }).then( (response) => {if (response.status!=200) console.log(`Error saving file index.json`)}); 
+                    };
                 }
             }
             else if (selection.length === 2) {
@@ -220,12 +242,12 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 trend = trend - 180; }
                 const distance = v1.distanceTo(v2);
                 newAnnot[site].lines.push({
-                verts: [v1, v2],
-                color: annotColor,
-                trend: trend < 0 ? trend + 360 : trend,
-                plunge,
-                length: distance,
-                });
+                    verts: [v1, v2],
+                    color: annotColor,
+                    trend: trend < 0 ? trend + 360 : trend,
+                    plunge,
+                    length: distance,
+                    });
             } else if (selection.length === 3) {
                 const v1 = selection[0];
                 const v2 = selection[1];
@@ -238,12 +260,12 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 if (strike < 0) strike += 360;
                 const dipdir = (strike + 90) % 360;
                 newAnnot[site].planes.push({
-                verts: [v1, v2, v3],
-                color: annotColor,
-                strike,
-                dip,
-                dipdir,
-                });
+                    verts: [v1, v2, v3],
+                    color: annotColor,
+                    strike,
+                    dip,
+                    dipdir,
+                    });
             } else if (selection.length > 3) {
                 let totalLength = 0;
                 for (let i = 0; i < selection.length - 1; i++) {
@@ -269,7 +291,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             three.current.renderer.domElement.removeEventListener("dblclick", handleDoubleClick);
             three.current.renderer.domElement.removeEventListener("click", handleSingleClick);
         };
-    }, [site, init, selection]);
+    }, [site, init, selection, annotations]);
 
     // Create and add html labels
     useEffect(()=>{
@@ -289,7 +311,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         if (tour.sites[site].labels) {
             Object.keys(tour.sites[site].labels).forEach( (k) => {
                 const lab = tour.sites[site].labels[k];
-                drawLabel(lab.html, new THREE.Vector3(...lab.pos));
+                drawLabel(lab.html, new THREE.Vector3(...lab.pos), k);
             } );
         }
     },[site, init, labelVis]);
@@ -297,7 +319,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
       // ** Draw annotations **
       useEffect(()=>{
         if (!init) return;
-
+        
         // clear annotations
         [spheresRef, lineRef, planeRef].forEach( (ref)=>{
           ref.current.forEach((obj) => {
@@ -325,7 +347,10 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         } else if (selection.length > 3){
           drawLine({verts:selection, color:annotColor});
         }
-    
+        
+        if (!annotations) return;
+        if (!(site in annotations)) return;
+        
         // add annotation lines / planes / polylines
         annotations[site].lines.forEach( (l) => { drawLine(l) } );
         annotations[site].planes.forEach( (l) => { drawPlane(l) } );
@@ -333,18 +358,18 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
       }, [site, init, selection, annotations, annotColor, annotVis]);
     
     // **Add labels **
-    const drawLabel = (html, position) => {
+    const drawLabel = (html, position, key) => {
         // add corresponding 2D (HTML) object
         const labelDiv = document.createElement( 'div' );
         labelDiv.className = 'outerdiv';
         labelDiv.innerHTML = '<div class="labeldiv">' + html + '</div>';
         const label = new CSS2DObject( labelDiv );
         label.position.copy(position);
+        label.userData = {key: key};
         labelRef.current.push(label);
         three.current.scene.add( label );
 
         const dblclick = (evt) => {
-            // todo; delete label from labelRef and three.current.scene
             // Remove the label from labelRef
             const index = labelRef.current.indexOf(label);
             if (index > -1) {
@@ -353,6 +378,21 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
 
             // Remove the label from three.current.scene
             three.current.scene.remove(label);
+
+            // remove label from the tour
+            delete tour.sites[site].labels[key];
+
+            // save index.json if in dev mode
+            if (tour.devURL){
+                fetch("./update", {
+                    method : 'POST', 
+                    headers : { 'Content-Type':'application/json; charset=utf-8'},
+                    body: JSON.stringify(
+                      {filename: "./index.json",
+                       content: JSON.stringify(tour, null, 2),
+                      })
+                  }).then((response) => {if (response.status!=200) console.log(`Error saving index.json`)}); 
+            }
         }
         labelDiv.addEventListener("dblclick", dblclick);
     };

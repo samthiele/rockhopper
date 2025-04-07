@@ -25,11 +25,44 @@ const fetchAnnotation = async (url) => {
 
 const Hopper = ({tour}) => {
     const three = useRef({pointSize: 0.1}); // three.js objects
-    const [annotations, setAnnotations] = useState({});
+    const [annotations, setAnnotations] = useState(null);
     const [init, setInit] = useState(false);
     const [site, setSite] = useState('');
     const [currentMedia, setCurrentMedia] = useState(null); // current media we are connected to
     const [fixCamera, setFixedCamera] = useState(false);
+
+    // load annotations
+    useEffect( ()=>{
+        if (annotations) return;
+        if (!tour.annotURL){
+            tour['annotURL'] = 'annotations.json'
+        }
+        const fannot = async () => {
+            let annot = {};
+            if (tour.annotURL){
+                // fetch from specified URL
+                annot =  await fetchAnnotation(tour.annotURL)
+            }
+            setAnnotations(annot);
+        }
+        fannot();
+    }, []);
+
+    // save annotations when they are updated
+    // (if running on a dev server)
+    useEffect( ()=>{
+        if (tour.devURL && annotations) {
+            // send a POST that updates markdown file
+            fetch("./update", {
+                method : 'POST', 
+                headers : { 'Content-Type':'application/json; charset=utf-8'},
+                body: JSON.stringify(
+                {   filename: tour.annotURL,
+                    content: JSON.stringify(annotations)
+                })
+            }).then( (response) => {if (response.status!=200) console.log(`Error saving file ${tour.annotURL}`)});  
+        }
+    }, [annotations] );
 
     // set current site
     const params = useParams();
@@ -37,18 +70,12 @@ const Hopper = ({tour}) => {
         if ((!params.site in tour.synonyms)) return;
 
         // parse site
-        const newSite = tour.synonyms[params.site];
+        const newSite = tour.synonyms[params.site.toLowerCase()];
 
-        // fetch or create annotation JSON (if it does not already exist)
-        if (!annotations[newSite]) {
-            if (tour.sites[newSite].annotURL){
-                // fetch from specified URL
-                const annot =  fetchAnnotation(tour.sites[newSite].annotURL);
-            } else {
-                // initialise an empty annotation
+        // create annotation if it does not already exist
+        if (annotations && !annotations[newSite]) {
                 annotations[newSite] = {lines:[], planes:[], traces:[]};
                 setAnnotations({...annotations}); // update
-            }
         }
         
         // update site
@@ -72,7 +99,16 @@ const Hopper = ({tour}) => {
         }
 
         // set media URL
-        const mediaURL = tour.sites[ newSite ].mediaURL;
+        let mediaURL = tour.sites[ newSite ].mediaURL;
+        if (tour.sites[ newSite ].mediaType === "cloud"){
+            if (!mediaURL.startsWith("http")){ // allow absolute URLS
+                if (tour.devURL){ // use local dev server
+                    mediaURL = `${tour.devURL}/${mediaURL}`
+                } else { // otherwise use defined remote server
+                    mediaURL = `${tour.cloudURL}/${mediaURL}`
+                }
+            }
+        }
         if (mediaURL != currentMedia){
             setCurrentMedia(mediaURL);
         }
@@ -105,6 +141,7 @@ const Hopper = ({tour}) => {
             <SplitScreen left={[<MarkdownSidebar tour={tour} 
                                                  site={site}
                                                  annotations={annotations}
+                                                 setAnnotations={setAnnotations}
                                                  three={three}
                                                  key={"md"}/>] } 
                         right={[<>

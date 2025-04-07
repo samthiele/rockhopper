@@ -195,14 +195,18 @@ def exportZA(points, zarr_store_path,
 
     # chunk data into spatial clusters
     # (so that we can give the points a sensible order)
-    sc = MiniBatchKMeans( n_clusters=int( len(points) / chunk_size ), tol=0.1 )
+    sc = MiniBatchKMeans( n_clusters=int( len(points) / chunk_size ), tol=0.1,
+                          n_init='auto' )
     cid = sc.fit_predict( points[:, :3] )
     ixx = np.unique(cid)
     
     # define colors json object defining visualisation options
     if stylesheet is None:
-        stylesheet = {'rgb':{'R':{3,0,1},'B':{4,0,1},'C':{5,0,1}}, 
-                  'elev' : (2, {'scale':'viridis', 'limits':(-100,100,255)})}
+        if points.shape[1] >= 6:
+            stylesheet = {'rgb':{'color':{'R':[3,0,1],'G':[4,0,1],'B':[5,0,1]}}}
+        else:
+            stylesheet = {'elev':(2, {'scale':'viridis', 'limits':(-100,100,255)})}
+    
     if styles is None:
         styles = list( stylesheet.keys() )
     for k in styles:

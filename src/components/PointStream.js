@@ -283,7 +283,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         //  size: 3.2*size,sizeAttenuation: true, vertexColors: true });
         const material = new THREE.ShaderMaterial({
           uniforms: {
-            worldSize: { value:2000*three.current.pointSize } // window.innerHeight / 2 }
+            worldSize: { value:1000*three.current.pointSize } // window.innerHeight / 2 }
           },
           vertexShader: vertexShader,
           fragmentShader: fragmentShader,
@@ -313,7 +313,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
       // apply highlights and masks?
       if (activeGroup){
         densePoints.current.geometry.attributes.color = prevRGB.current.clone();
-        if (activeGroup in attrs.groups){
+        if (attrs.groups && activeGroup in attrs.groups){
           applyHighlight(densePoints.current, points, attrs.groups[activeGroup]);
         }
       }
@@ -334,7 +334,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         colourise(densePoints.current, points, attrs.stylesheet, activeStyle);
         prevRGB.current = densePoints.current.geometry.attributes.color.clone();
       }
-      if (activeGroup && attrs.groups[activeGroup]){
+      if (attrs.groups && activeGroup && attrs.groups[activeGroup]){
         applyHighlight(densePoints.current, points, attrs.groups[activeGroup]);
       }
       densePoints.current.geometry.attributes.color.needsUpdate = true;
@@ -344,7 +344,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
   useEffect( ()=> {
     if (!densePoints.current || !attrs || !prevRGB.current || !points) return;
     densePoints.current.geometry.attributes.color = prevRGB.current.clone(); // restore previous colour
-    if (activeGroup && attrs.groups[activeGroup]){
+    if (attrs.groups && activeGroup && attrs.groups[activeGroup]){
       applyHighlight(densePoints.current, points, attrs.groups[activeGroup]);
     }
     densePoints.current.geometry.attributes.color.needsUpdate = true;

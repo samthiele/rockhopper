@@ -55,7 +55,7 @@ const scrollToHeading = (id) => {
   }
 };
 
-const MarkdownSidebar = ({tour, site, annotations, three}) => {
+const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
   const [activeTab, setActiveTab] = useState('guide'); // visible tab
   const [activeLanguage, setLanguage] = useState(0); // active language
   const [markdown, setMarkdown] = useState(null); // loaded .md files
@@ -101,9 +101,11 @@ const MarkdownSidebar = ({tour, site, annotations, three}) => {
 
     // edit functions
     const handleDoubleClick = () => {
-      if (!isEditing){
-        setEditedContent(content);
-        setIsEditing(true);
+      if (tour.devURL || activeTab.toLowerCase()==='notebook'){ // editing only for notes or in dev mode
+        if (!isEditing){
+          setEditedContent(content);
+          setIsEditing(true);
+        }
       }
     };
     const handleKeyDown = (event) => {
@@ -113,6 +115,19 @@ const MarkdownSidebar = ({tour, site, annotations, three}) => {
         setMarkdown({...markdown}); // update "stored" markdown 
         setContent(editedContent); // update displayed content
         setIsEditing(false); // no longer editing
+
+        // update .md file if dev server is running?
+        if (tour.devURL){
+          // send a POST that updates markdown file
+          fetch("./update", {
+            method : 'POST', 
+            headers : { 'Content-Type':'application/json; charset=utf-8'},
+            body: JSON.stringify(
+              {filename: markdown[activeTab].url,
+               content: editedContent
+              })
+          }).then( (response) => {if (response.status!=200) console.log(`Error saving file ${markdown[activeTab].url}`)});  
+        }
       }
     };
     
@@ -223,6 +238,7 @@ const MarkdownSidebar = ({tour, site, annotations, three}) => {
                     </div>
                   );
                 }
+                // youtube video
                 if (parts[0] === 'youtube' && (parts.length) == 2){
                   const srcUrl = parts[1].trim();
                   return (
@@ -232,10 +248,6 @@ const MarkdownSidebar = ({tour, site, annotations, three}) => {
                     </div>
                   );
                 }
-                // youtube video
-
-                //
-
                 // stereonet? [ todo ]
                 
                 // not a command; return a normal block quote
@@ -243,7 +255,7 @@ const MarkdownSidebar = ({tour, site, annotations, three}) => {
               }
             }} 
         >
-          {content + ((activeTab.toLowerCase()==='notebook')?annotToMD(annotations[site]):"")}
+          {content + (annotations && (activeTab.toLowerCase()==='notebook')?annotToMD(annotations[site]):"")}
         </ReactMarkdown></>)}
       </div>
       <div className="lbar">
@@ -253,17 +265,44 @@ const MarkdownSidebar = ({tour, site, annotations, three}) => {
                          key={i}> {v} </button>
         })}
         -
-        <button className="lbutton" onClick={() => {
-                  const v = tour.sites[site].view || {};
+        {tour.devURL ? (
+          <button className="lbutton" onClick={() => {
+                  // get view
+                  const v = {...tour.sites[site].view} || {};
                   v.pos = [three.current.camera.position.x, 
                             three.current.camera.position.y, 
                             three.current.camera.position.z];
                   v.tgt = [three.current.controls.target.x, 
                             three.current.controls.target.y, 
                             three.current.controls.target.z];
-                  v.
-                  tour.sites[site].view = v;
-              }}> Set View </button>
+                  
+                  // get site to update
+                  let txt = prompt("Enter new site name (or nothing to update current site)").trim().toLowerCase();
+                  let sname = site;
+                  if (txt !== ''){
+                    sname = txt
+                    if (!(sname in tour.sites)){
+                      // create a new site, based on the current one
+                      tour.sites[sname] = {...tour.sites[site]} // duplicate :-) 
+                      tour.synonyms[sname] = sname; // don't forget this!
+                    }
+                    window.location.hash = `#/${sname}`; // update hash
+                  }
+                  
+                  // make update
+                  tour.sites[sname].view = v;
+                  
+                  // send a POST that updates JSON file
+                  fetch("./update", {
+                    method : 'POST', 
+                    headers : { 'Content-Type':'application/json; charset=utf-8'},
+                    body: JSON.stringify(
+                      {filename: "./index.json",
+                       content: JSON.stringify(tour, null, 2),
+                      })
+                  }).then((response) => {if (response.status!=200) console.log(`Error saving index.json`)});   
+                }}> Save View </button>) : (<></>) }
+
         <button className="lbutton" onClick={() => {
               // Create a Blob from the markdown content
               const blob = new Blob([content], { type: 'text/markdown' });

@@ -18,7 +18,6 @@ const App = () => {
           tour.current.synonyms[k] = k; // makes for easier lookups
         })
         setLoading(false);
-        console.log(params);
         console.log(data);
       })
       .catch(error => {
