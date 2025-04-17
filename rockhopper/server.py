@@ -9,6 +9,7 @@ import numpy as np
 from rockhopper.clouds import loadPLY, exportZA
 import rockhopper.ui
 import shutil
+import numpy as np
 
 def read_json(file_path):
     """
@@ -28,6 +29,30 @@ def read_json(file_path):
         print(f"Error: The file at {file_path} was not found.")
     except json.JSONDecodeError:
         print(f"Error: The file at {file_path} is not a valid JSON file.")
+
+def write_json(data, filename):
+    """
+    Write a json file using json.dumps, but some fancy formatting.
+    """
+    def custom_serializer(value, indent=0, ichar='  '):
+        if isinstance(value, list):
+            return json.dumps(value, separators=(',', ': ')) # Lists on one line
+        elif isinstance(value, np.ndarray):
+            return json.dumps(value.tolist(), separators=(',', ': ')) # Numpy arrays on one line
+        elif isinstance(value, dict):
+            lines = []
+            for key, value in value.items():
+                value_str = custom_serializer(value, indent+1)
+                indented = ichar*indent+f'{json.dumps(key)}: {value_str}' # Indent the key-value pair
+                lines.append(ichar*indent + indented)
+            return '{\n' + ',\n'.join(lines)+'  }'
+        else:
+            # Pretty-print non-list values (like dicts, strings, numbers)
+            return json.dumps(value, indent=0)
+
+    with open(filename, 'w') as f:
+        text = custom_serializer(data)
+        f.write(text)
 
 defaultMD = """
 # My new markdown file 
@@ -98,16 +123,23 @@ class ServerThread(threading.Thread):
         self.server.shutdown()
 
 class VFT(object):
-    def __init__(self, vft_path, cloud_path=None):
+    """
+    A class for creating virtual field trips (VFTs). This includes ingesting the relevant
+    data, defining field trip structure and creating dummy content. It also runs a local
+    development server that can be used to define content and create annotations and labels. 
+    """
+    def __init__(self, vft_path, cloud_path=None, overwrite=False):
         """
         Initialize the VFT application with specified paths and configurations.
 
         Parameters
         -------------
-        vft_path, str
+        vft_path : str
             The file path to the VFT directory. This path is also used as the static folder for the Flask app.
-        cloud_path, str, optional
+        cloud_path : str
             The file path to store and serve point cloud streams. Defaults to None.
+        overwrite : str
+            True if javascript and html elements should be overwritten when creating the tour.
         """
             
         # basic VFT properties
@@ -121,7 +153,7 @@ class VFT(object):
         self.host = None
 
         # copy required files from rockhopper.ui
-        rockhopper.ui.copyTo(vft_path)
+        rockhopper.ui.copyTo(vft_path, overwrite=overwrite)
 
         # setup app
         self.app = Flask(__name__, static_folder=vft_path)
@@ -144,6 +176,13 @@ class VFT(object):
             """
             Serve current tour index json
             """
+            # load index from file (in case of manual changes)
+            pth = os.path.join( self.vft_path, 'index.json' )
+            if os.path.exists(pth):
+                self.index = read_json( pth )
+            else:
+                self.updateIndex()
+
             # set dev server directory
             self.index['devURL'] = f"http://{self.host}:{self.port}"
 
@@ -159,10 +198,13 @@ class VFT(object):
             data = request.json
             filename = data['filename']
             content = data['content']
-            
-            # write relevant file
-            with open( os.path.join(self.vft_path, filename), 'w' ) as f:
-                f.write(content)
+            dtype = data['dtype']
+            if 'json' in dtype.lower(): # parse content of json text to a json dictionary
+                content = json.loads(content)
+                write_json(content, os.path.join(self.vft_path, filename)) # write relevant file with pretty formatting
+            else: # write relevant file directly
+                with open( os.path.join(self.vft_path, filename), 'w' ) as f:
+                    f.write(content)
                             
             # update index (if this has changed)
             if 'index.json' in filename:
@@ -217,8 +259,9 @@ class VFT(object):
     def writeIndex(self):
         if 'devURL' in self.index: # hide this property
             del self.index['devURL']
-        with open(os.path.join(self.vft_path, 'index.json'), 'w' ) as f:
-            json.dump(self.index, f, indent=2,  )
+        write_json(self.index, os.path.join(self.vft_path, 'index.json'))
+        #with open(os.path.join(self.vft_path, 'index.json'), 'w' ) as f:
+        #    json.dump(self.index, f, indent=2,  )
     
     def start(self, port=4002):
         if self.server_thread and self.server_thread.is_alive():
@@ -286,7 +329,10 @@ class VFT(object):
             paths.append(pth)
             if not os.path.exists(os.path.join( self.vft_path, pth)):
                 with open(os.path.join( self.vft_path, pth ),'w') as f:
-                    f.write(defaultMD) # write default text
+                    if 'en' in lang:
+                        f.write(defaultMD) # write default text
+                    else:
+                        f.write("Unfortunately this page has not yet been translated.")
         
         # add to index.json
         if site is None:
@@ -295,8 +341,9 @@ class VFT(object):
         else:
             self.index['sites'][site.lower()]['tabs'] = self.index['sites'][site.lower()].get('tabs',{})
             self.index['sites'][site.lower()]['tabs'][name] = paths
+        self.writeIndex() # save changes
 
-    def addCloud( self, site, name, cloud, site_kwds={}, **kwds):
+    def addCloud( self, site, name, cloud=None, site_kwds={}, **kwds):
         """
         Convert a PLY point cloud to streamable format and store it in the 
         specified cloud_path (if this is not None).
@@ -311,7 +358,8 @@ class VFT(object):
         cloud : str | pathlib.Path | np.ndarray
             A path to the .ply file to load the cloud from, or a numpy array
             of shape (n,d) containing n points and d properties. The first six properties
-            must be `x, y, z, r, g, b`.
+            must be `x, y, z, r, g, b`. If None, it is assumed that the cloud specified by
+            `name` has already been created.
         site_kwds : keywords to pass to `self.addSite( ... )` when creating a new site.
 
         Keywords
@@ -319,23 +367,24 @@ class VFT(object):
         All keywords are passed directly to `rockhopper.exportZA(...)`. These should be used
         to e.g., define visualisation styles, highlights and/or masks. 
         """
-        assert self.cloud_path is not None, "Create a VFT with a `cloud_path` to add local cloud streams."
-        if isinstance(cloud, str) or isinstance(cloud, Path):
-            cloud = loadPLY( cloud )
-            # retrieve attributes from resulting dict
-            xyz = cloud['xyz']
-            rgb = cloud['rgb']
-            if 'attr' in cloud:
-                attr = cloud['attr']
-                cloud = np.hstack([xyz, rgb, attr])
-            else:
-                cloud = np.hstack([xyz, rgb])
+        if cloud is not None:
+            assert self.cloud_path is not None, "Create a VFT with a `cloud_path` to add local cloud streams."
+            if isinstance(cloud, str) or isinstance(cloud, Path):
+                cloud = loadPLY( cloud )
+                # retrieve attributes from resulting dict
+                xyz = cloud['xyz']
+                rgb = cloud['rgb']
+                if 'attr' in cloud:
+                    attr = cloud['attr']
+                    cloud = np.hstack([xyz, rgb, attr])
+                else:
+                    cloud = np.hstack([xyz, rgb])
         
-        print("Building stream with shape %s"%str(cloud.shape))
+            print("Building stream with shape %s"%str(cloud.shape))
 
-        # export array
-        out_path = os.path.join( self.cloud_path, f"{name}.zarr")
-        exportZA( cloud, out_path, **kwds)
+            # export array
+            out_path = os.path.join( self.cloud_path, f"{name}.zarr")
+            exportZA( cloud, out_path, **kwds)
 
         # add site for this cloud
         if site is not None:

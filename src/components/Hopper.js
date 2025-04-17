@@ -58,7 +58,8 @@ const Hopper = ({tour}) => {
                 headers : { 'Content-Type':'application/json; charset=utf-8'},
                 body: JSON.stringify(
                 {   filename: tour.annotURL,
-                    content: JSON.stringify(annotations)
+                    content: JSON.stringify(annotations),
+                    dtype: 'application/json'
                 })
             }).then( (response) => {if (response.status!=200) console.log(`Error saving file ${tour.annotURL}`)});  
         }
@@ -67,7 +68,7 @@ const Hopper = ({tour}) => {
     // set current site
     const params = useParams();
     useEffect( ()=>{
-        if ((!params.site in tour.synonyms)) return;
+        if (!(params.site.toLowerCase() in tour.synonyms)) return;
 
         // parse site
         const newSite = tour.synonyms[params.site.toLowerCase()];

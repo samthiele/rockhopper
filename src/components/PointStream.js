@@ -207,16 +207,16 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         // Adjust Camera
         let center = new THREE.Vector3();
         let pos;
+        bbox.getCenter(center);
+        const size = bbox.getSize(new THREE.Vector3()).length();
+        const maxDistance = size * 2;
+        three.current.camera.far = maxDistance * 5; // set far clipping plane
         if (site in tour.sites 
             && tour.sites[site].view
             && tour.sites[site].view.tgt){
           center = new THREE.Vector3(...tour.sites[site].view.tgt);
           pos = tour.sites[site].view.pos;
         } else {
-          bbox.getCenter(center);
-          const size = bbox.getSize(new THREE.Vector3()).length();
-          const maxDistance = size * 2;
-          three.current.camera.far = maxDistance * 5;
           pos = [center.x, center.y-maxDistance/3, center.z+maxDistance/3];
         }
         three.current.camera.updateProjectionMatrix();
@@ -244,12 +244,18 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
       const xyz = seeds.get([null, slice(0,3)]);
       for (let i=0; i<seeds.shape[0]; i++){
         if (streamed[i]) continue; // skip already streamed points
-        const worldPos = new THREE.Vector3(xyz.get([i,0]), xyz.get([i,1]), xyz.get([i,2]));
-        const screenPos = worldPos.project(three.current.camera); // Convert to normalized screen space (-1 to 1)
-        const distSq = screenPos.x*screenPos.x + screenPos.y*screenPos.y; // Distance from screen center (0,0)
-        if (distSq < closestDistance) {
-          closestDistance = distSq;
-          closestIndex = i;
+        if (i==0) { // always stream chunk 0 first
+          closestIndex = 0;
+          seedPoints.current.visible = false; 
+          break;
+        } else { // then stream the closest
+          const worldPos = new THREE.Vector3(xyz.get([i,0]), xyz.get([i,1]), xyz.get([i,2]));
+          const screenPos = worldPos.project(three.current.camera); // Convert to normalized screen space (-1 to 1)
+          const distSq = screenPos.x*screenPos.x + screenPos.y*screenPos.y; // Distance from screen center (0,0)
+          if (distSq < closestDistance) {
+            closestDistance = distSq;
+            closestIndex = i;
+          }
         }
       }
       
@@ -283,7 +289,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         //  size: 3.2*size,sizeAttenuation: true, vertexColors: true });
         const material = new THREE.ShaderMaterial({
           uniforms: {
-            worldSize: { value:1000*three.current.pointSize } // window.innerHeight / 2 }
+            worldSize: { value:3000*three.current.pointSize } // window.innerHeight / 2 }
           },
           vertexShader: vertexShader,
           fragmentShader: fragmentShader,
@@ -292,7 +298,8 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         });
 
         const cloud = new THREE.Points(geometry, material);
-        cloud.userData.blockDelete=true;
+        cloud.userData.blockDelete=true; // don't let this be deleted.
+        cloud.userData.pickable=true; // allow picking.
         colourise( cloud, points, attrs.stylesheet, activeStyle, streamCount); // set colours
         prevRGB.current = cloud.geometry.attributes.color.clone();
         three.current.scene.add(cloud);

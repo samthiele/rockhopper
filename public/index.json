@@ -181,6 +181,7 @@
     "start": "site1"
   },
   "tabs": {
+    "_order" : ["Notebook","References","Help"],
     "Help": [
       "./md/help_en.md",
       "./md/help_de.md"

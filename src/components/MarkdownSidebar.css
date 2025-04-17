@@ -1,5 +1,7 @@
 
-
+a {
+    color:#007bff;
+}
 .markdown {
     text-align:left;
     width: 100%;
@@ -39,7 +41,7 @@ padding: 8px;
     height: 100%;
     min-width: 300px;
     position: relative;
-    background-color: #f4f4f4;
+    background-color: white;
 }
 .content{
     flex: 1;
@@ -47,6 +49,8 @@ padding: 8px;
     overflow-y: scroll;
     margin-top: 2.5em;
     margin-bottom: 3em;
+    scrollbar-color: #007bff white;
+    scrollbar-width: thin;
 }
 .tabs {
     position: absolute;
@@ -60,10 +64,11 @@ padding: 8px;
     padding: 4px 12px;
     cursor: pointer;
     text-align: center;
-    background-color: #ddd;
+    background-color: white;
     border: none;
-    font-size: 14px;
-    border-radius: 5px;
+    font-size: 12px;
+    border-radius: 10px;
+    border: 1px solid black;
     color: #333;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }

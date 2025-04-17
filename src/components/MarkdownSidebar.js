@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm'
 import './MarkdownSidebar.css';
@@ -69,10 +70,16 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
   // load md files
   let tabs;
   tabs = {...tour.sites[ site ].tabs, ...tour.tabs};
+  let gkeys = Object.keys(tour.tabs); // "global" tabs
+  let lkeys = Object.keys(tour.sites[site].tabs); // site-specific tabs
+  if (tour.tabs._order) gkeys = tour.tabs._order; // order is specified
+  if (tour.sites[site].tabs._order) lkeys = tour.sites[site].tabs._order; // order is specified
+  const tabNames = [...lkeys, ...gkeys]; // all keys
   useEffect(() => {
     async function loadMD(){
       const mdown = {...markdown}; // put fetched markdown here
-      for (const k of Object.keys(tabs)) {
+      for (const k of tabNames) {
+        console.log(k);
         const url = tabs[k][activeLanguage];
         if (!(url in cache.current)){
           cache.current[url] = await fetchMarkdown( tabs[k][activeLanguage] );
@@ -83,7 +90,7 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
       if (activeTab.toLowerCase() in mdown){
         setContent( mdown[activeTab.toLowerCase()].text );
       } else{
-        const t = Object.keys(tour.tabs)[0];
+        const t = tabNames[0];
         setContent( mdown[t.toLowerCase()].text );
         setActiveTab(t.toLowerCase());
       }
@@ -92,12 +99,14 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
     }, [site, activeLanguage]); // depends on selected language!
 
     // Scroll to heading if URL contains a hash
+    const params = useParams();
     useEffect(() => {
       if (window.location.hash) {
-        const id = window.location.hash.substring(1);
+        const id = params.site.toLowerCase();
+        //const id = window.location.hash.substring(1);
         setTimeout(() => scrollToHeading(id), 50); // Delay to ensure content is loaded
       }
-    }, [content]);
+    }, [content, params]);
 
     // edit functions
     const handleDoubleClick = () => {
@@ -124,7 +133,8 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
             headers : { 'Content-Type':'application/json; charset=utf-8'},
             body: JSON.stringify(
               {filename: markdown[activeTab].url,
-               content: editedContent
+               content: editedContent,
+               dtype: 'application/text'
               })
           }).then( (response) => {if (response.status!=200) console.log(`Error saving file ${markdown[activeTab].url}`)});  
         }
@@ -138,7 +148,7 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
   return (
     <div className="sidebar">
       <div className="tabs">
-        { Object.keys(tabs).map( (k) => {
+        { tabNames.map( (k) => {
           return <button
             className={`tab ${activeTab.toLowerCase() === k.toLowerCase() ? 'active' : ''}`}
             onClick={() => {setActiveTab(k.toLowerCase()); setContent( markdown[k.toLowerCase()].text );}}
@@ -187,8 +197,8 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
               },
               img : ({node, children } ) => { // set size and add alt-text as figure caption
                 return (
-                  <figure>
-                    <img src={node.properties.src} width="100%" />
+                  <figure style={{textAlign:"center"}} >
+                    <img src={node.properties.src} style={{maxWidth:"100%"}} />
                     <figcaption><em>{node.properties.alt}</em></figcaption>
                   </figure>
                   );
@@ -299,6 +309,7 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
                     body: JSON.stringify(
                       {filename: "./index.json",
                        content: JSON.stringify(tour, null, 2),
+                       dtype: 'application/json'
                       })
                   }).then((response) => {if (response.status!=200) console.log(`Error saving index.json`)});   
                 }}> Save View </button>) : (<></>) }

@@ -62,7 +62,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         three.current.scene = new THREE.Scene();
 
         // Initialize Camera
-        three.current.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 5000);
+        three.current.camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 10000); // 75
         if (!fixCamera) three.current.camera.up.set(0,0,1);
 
         // Orbit Controls
@@ -84,6 +84,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         }
         if (fixCamera){
             three.current.controls.screenSpacePanning = false;
+            three.current.camera.fov = 65; // wider default fov for photospheres
             three.current.controls.enableZoom = false;
             three.current.controls.enablePan = false;
             three.current.camera.position.set(10,0,0); // for some reason orbit controls don't work if camera is at origin...
@@ -155,10 +156,17 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         const handleSingleClick = (event) => {
             if (!(event.ctrlKey || event.altKey || event.metaKey)) return; // Only if Ctrl is held
             const intersects = getIntersects(event);
-            if (intersects.length > 0) {
-            const selectedPoint = intersects[0].point.clone();
-            selection.push(selectedPoint)
-            setSelection([ ...selection ]); // update selection
+            for (const i in intersects){
+                if (intersects[i].object.userData.pickable){ // must be set to allow picking on this object
+                    const selectedPoint = intersects[i].point.clone();
+                    const ray = three.current.camera.position.clone();
+                    ray.subVectors(ray, selectedPoint).normalize();
+                    ray.multiplyScalar(3*three.current.pointSize); 
+                    selectedPoint.addVectors(selectedPoint, ray); // move point towards camera a little to avoid zblending issues
+                    selection.push(selectedPoint)
+                    setSelection([ ...selection ]); // update selection
+                    return;
+                }
             }
         };
 
@@ -226,6 +234,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                         body: JSON.stringify(
                             {filename: "./index.json",
                             content: JSON.stringify(tour, null, 2),
+                            dtype: 'application/json'
                             })
                         }).then( (response) => {if (response.status!=200) console.log(`Error saving file index.json`)}); 
                     };
@@ -390,6 +399,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                     body: JSON.stringify(
                       {filename: "./index.json",
                        content: JSON.stringify(tour, null, 2),
+                       dtype: 'application/json'
                       })
                   }).then((response) => {if (response.status!=200) console.log(`Error saving index.json`)}); 
             }

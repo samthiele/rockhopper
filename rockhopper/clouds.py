@@ -5,9 +5,11 @@ import os
 import numpy as np 
 import zarr
 from numcodecs import Blosc
+#from zarr.codecs import BloscCodec
 from sklearn.cluster import MiniBatchKMeans
 from tqdm import tqdm
 from scipy.spatial import KDTree
+import warnings
 
 def savePLY(path, xyz, rgb=None, normals=None, attr=None, names=None):
     """
@@ -191,15 +193,21 @@ def exportZA(points, zarr_store_path,
 
     # Make sure chunk_size is not bigger than total points
     num_points = len( points )
-    chunk_size = min(chunk_size, num_points)
+    chunk_size = min(chunk_size, num_points / 3) # we need at least some chunks...
 
-    # chunk data into spatial clusters
+    # chunk remaining data into spatial clusters
     # (so that we can give the points a sensible order)
-    sc = MiniBatchKMeans( n_clusters=int( len(points) / chunk_size ), tol=0.1,
-                          n_init='auto' )
-    cid = sc.fit_predict( points[:, :3] )
-    ixx = np.unique(cid)
-    
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        sc = MiniBatchKMeans( n_clusters=int( len(points) / chunk_size ), tol=0.1,
+                            n_init='auto' )
+        cid = sc.fit_predict( points[:, :3] )+1
+
+        # randomly select the first chunk (this should be evenly distributed)
+        # (and inject into cids)
+        cid[ np.random.choice(len(points), chunk_size, replace=False) ] = 0 
+        ixx = np.unique(cid) # get unique classes
+
     # define colors json object defining visualisation options
     if stylesheet is None:
         if points.shape[1] >= 6:
@@ -226,6 +234,7 @@ def exportZA(points, zarr_store_path,
     # build chunks and add to the zarr object
     centers = []
     compressor = Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)
+    #compressor = BloscCodec(cname="zstd", clevel=9, shuffle="shuffle")
     for i,ix in tqdm( enumerate(ixx), desc="Extracting chunks", leave=False):
         c = points[ cid == ix, : ]
         c[:,:3] -= origin

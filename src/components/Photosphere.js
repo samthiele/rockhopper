@@ -19,6 +19,7 @@ const PhotosphereViewer = ({ tour, site, three, init, currentMedia }) => {
             const material = new THREE.MeshBasicMaterial({ map: texture });
             const sphere = new THREE.Mesh(geometry, material);
             sphere.userData.blockDelete=true;
+            sphere.userData.pickable=true;
             three.current.scene.add(sphere);
         });
 

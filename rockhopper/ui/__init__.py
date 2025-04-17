@@ -19,6 +19,8 @@ def copyTo( path, overwrite=False ):
         pth = os.path.join(root, f)
         if (not overwrite) and (os.path.exists( os.path.join(path, f) )): 
             continue # don't overwrite anything pre-existing
+        if (".md" in f) and (os.path.exists( os.path.join(path, f) )):
+            continue # don't overwrite any markdown files
         if os.path.isdir(pth):
             shutil.copytree(pth, os.path.join(path, f), dirs_exist_ok=True)
         else:
