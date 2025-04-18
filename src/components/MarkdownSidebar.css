@@ -81,11 +81,18 @@ padding: 8px;
 
 .lbar {
     position: absolute;
-    bottom: 10px;
+    bottom: 2em;
     left: 10px;
     display: flex;
     flex-direction: row;
     gap: 10px; /* Space between buttons */
+}
+.footer {
+    bottom: 10px;
+    left: 10px;
+    text-align: center;
+    width: 100%;
+    font-size: 10pt;
 }
 .lbutton {
     padding: 4px 12px;

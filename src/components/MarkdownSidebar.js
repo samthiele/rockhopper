@@ -287,7 +287,7 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
                             three.current.controls.target.z];
                   
                   // get site to update
-                  let txt = prompt("Enter new site name (or nothing to update current site)").trim().toLowerCase();
+                  let txt = prompt("Enter new site name (or nothing to update current site)").trim().toLowerCase().replaceAll('"',"'");
                   let sname = site;
                   if (txt !== ''){
                     sname = txt
@@ -350,8 +350,8 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
           <button className="lbutton" onClick={() => { document.getElementById('upload-markdown').click(); }} >
               ⬆
           </button>
-
       </div>
+      <div className="footer"> <i>Made with <a href='https://github.com/samthiele/rockhopper'>RockHopper</a> </i></div>
     </div>
   );
 };

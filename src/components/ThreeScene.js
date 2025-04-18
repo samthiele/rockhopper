@@ -62,7 +62,11 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         three.current.scene = new THREE.Scene();
 
         // Initialize Camera
-        three.current.camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 10000); // 75
+        if (fixCamera){
+            three.current.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 10000); // wider default fov for photospheres
+        } else{
+            three.current.camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 10000); // more zoomed view for clouds
+        }
         if (!fixCamera) three.current.camera.up.set(0,0,1);
 
         // Orbit Controls
@@ -84,7 +88,6 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         }
         if (fixCamera){
             three.current.controls.screenSpacePanning = false;
-            three.current.camera.fov = 65; // wider default fov for photospheres
             three.current.controls.enableZoom = false;
             three.current.controls.enablePan = false;
             three.current.camera.position.set(10,0,0); // for some reason orbit controls don't work if camera is at origin...
@@ -219,8 +222,12 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                     
                     let k = 'label1';
                     if (tour.sites[site].labels) {
-                        const n = Object.keys(tour.sites[site].labels).length;
-                        k = `label${n+1}`;
+                        let n = 1;
+                        while (k in tour.sites[site].labels){
+                            n += 1;
+                            k = `label${n}`
+                        }
+                        console.log(k);
                     }
                     if (!tour.sites[site].labels) tour.sites[site].labels = {};
                     tour.sites[site].labels[k] = label;

@@ -13,6 +13,7 @@ const PhotosphereViewer = ({ tour, site, three, init, currentMedia }) => {
         three.current.pointSize = 0.25; // fixed size for photospheres
         const loader = new THREE.TextureLoader();
         loader.load(currentMedia, (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace; // Correct sRGB handling
             const geometry = new THREE.SphereGeometry(100, 60, 40);
             geometry.scale(-1, 1, 1); // Invert the sphere to view the texture from the inside
             //three.current.camera.lookAt([100,0,0]); // look along the x-axis 
