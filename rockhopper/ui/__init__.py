@@ -22,6 +22,8 @@ def copyTo( path, overwrite=False ):
         if (".md" in f) and (os.path.exists( os.path.join(path, f) )):
             continue # don't overwrite any markdown files
         if os.path.isdir(pth):
+            if os.path.exists(os.path.join(path, f)):
+                shutil.rmtree(os.path.join(path, f))
             shutil.copytree(pth, os.path.join(path, f), dirs_exist_ok=True)
         else:
             os.makedirs( os.path.dirname( os.path.join(path, f)), 

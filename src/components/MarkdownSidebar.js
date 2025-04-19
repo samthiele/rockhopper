@@ -87,15 +87,18 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
         mdown[k.toLowerCase()] = {url:url, text:cache.current[url]};
       }
       setMarkdown( mdown ) // update MD
-      if (activeTab.toLowerCase() in mdown){
-        setContent( mdown[activeTab.toLowerCase()].text );
-      } else{
-        const t = tabNames[0];
-        setContent( mdown[t.toLowerCase()].text );
-        setActiveTab(t.toLowerCase());
-      }
+      //if (activeTab.toLowerCase() in mdown){
+      //  setContent( mdown[activeTab.toLowerCase()].text );
+      //} else{
+      //  const t = tabNames[0];
+      setIsEditing(false);
+      setContent( mdown[tabNames[0].toLowerCase()].text );
+      setActiveTab(tabNames[0].toLowerCase());
+      //  setActiveTab(t.toLowerCase());
+      //}
     }
     loadMD();
+    
     }, [site, activeLanguage]); // depends on selected language!
 
     // Scroll to heading if URL contains a hash

@@ -289,7 +289,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         //  size: 3.2*size,sizeAttenuation: true, vertexColors: true });
         const material = new THREE.ShaderMaterial({
           uniforms: {
-            worldSize: { value:3000*three.current.pointSize } // window.innerHeight / 2 }
+            worldSize: { value:2000*three.current.pointSize } // window.innerHeight / 2 }
           },
           vertexShader: vertexShader,
           fragmentShader: fragmentShader,

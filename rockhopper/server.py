@@ -128,7 +128,7 @@ class VFT(object):
     data, defining field trip structure and creating dummy content. It also runs a local
     development server that can be used to define content and create annotations and labels. 
     """
-    def __init__(self, vft_path, cloud_path=None, overwrite=False):
+    def __init__(self, vft_path, cloud_path=None, overwrite=False, devMode=True):
         """
         Initialize the VFT application with specified paths and configurations.
 
@@ -140,6 +140,9 @@ class VFT(object):
             The file path to store and serve point cloud streams. Defaults to None.
         overwrite : str
             True if javascript and html elements should be overwritten when creating the tour.
+        devMode : bool
+            True (default) if the server will allow editing of files. This is useful for development, but can be set to False to test
+            behaviour during deployment.
         """
             
         # basic VFT properties
@@ -151,6 +154,7 @@ class VFT(object):
         self.updateIndex()
         self.port = None
         self.host = None
+        self.devMode = devMode
 
         # copy required files from rockhopper.ui
         rockhopper.ui.copyTo(vft_path, overwrite=overwrite)
@@ -184,7 +188,10 @@ class VFT(object):
                 self.updateIndex()
 
             # set dev server directory
-            self.index['devURL'] = f"http://{self.host}:{self.port}"
+            if 'devURL' in self.index:
+                del self.index['devURL'] # remove this property if it exists
+            if self.devMode:
+                self.index['devURL'] = f"http://{self.host}:{self.port}" # add devURL in dev mode
 
             # serve
             return jsonify(self.index)
@@ -194,6 +201,11 @@ class VFT(object):
             """
             Update one of the files in this tour
             """
+            if not self.devMode:
+                return jsonify(isError=True, 
+                               message="Development mode is off. Cannot update files.",
+                               statusCode=403,
+                               data={}), 403
             # get updated text
             data = request.json
             filename = data['filename']
