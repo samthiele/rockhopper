@@ -56,6 +56,10 @@ const scrollToHeading = (id) => {
   }
 };
 
+const scrollToTop = (markdownRef) => {
+  if (markdownRef){ markdownRef.scrollTo({ top: 0, behavior: 'smooth' }); }
+}
+
 const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
   const [activeTab, setActiveTab] = useState('guide'); // visible tab
   const [activeLanguage, setLanguage] = useState(0); // active language
@@ -79,23 +83,17 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
     async function loadMD(){
       const mdown = {...markdown}; // put fetched markdown here
       for (const k of tabNames) {
-        console.log(k);
         const url = tabs[k][activeLanguage];
         if (!(url in cache.current)){
           cache.current[url] = await fetchMarkdown( tabs[k][activeLanguage] );
+          scrollToTop(markdownRef.current); // scroll to top
         } 
         mdown[k.toLowerCase()] = {url:url, text:cache.current[url]};
       }
       setMarkdown( mdown ) // update MD
-      //if (activeTab.toLowerCase() in mdown){
-      //  setContent( mdown[activeTab.toLowerCase()].text );
-      //} else{
-      //  const t = tabNames[0];
       setIsEditing(false);
       setContent( mdown[tabNames[0].toLowerCase()].text );
       setActiveTab(tabNames[0].toLowerCase());
-      //  setActiveTab(t.toLowerCase());
-      //}
     }
     loadMD();
     
@@ -105,9 +103,9 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
     const params = useParams();
     useEffect(() => {
       if (window.location.hash) {
-        const id = params.site.toLowerCase();
-        //const id = window.location.hash.substring(1);
-        setTimeout(() => scrollToHeading(id), 50); // Delay to ensure content is loaded
+        let id = params.site.toLowerCase();
+        if (id in tour.synonyms) id = tour.synonyms[id]; // translate possibly
+        //setTimeout(() => scrollToHeading(id), 50); // Delay to ensure content is loaded
       }
     }, [content, params]);
 
@@ -144,10 +142,6 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
       }
     };
     
-  if (window.location.hash) {
-    const id = window.location.hash.substring(1);
-    scrollToHeading(id);
-  }
   return (
     <div className="sidebar">
       <div className="tabs">
@@ -174,34 +168,29 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
             remarkPlugins={[remarkGfm]}
             components={{
               p: props => <div {...props} className='markdownParagraph'/>,
-              h2: ({ node, children }) => { // set ID to allow scrolling to heading
-                if (children.type === 'a'){
-                  let id = children.props.children.toLowerCase().replace(/\s+/g, '');
-                  if (id in tour.synonyms) id = tour.synonyms[id]; // translate possibly
-                  const url = children.props.href;
-                  return <h2 id={id}><a href={url}>{children}</a></h2>;
-                } else {
-                  let id = children.toLowerCase().replace(/\s+/g, '');
-                  if (id in tour.synonyms) id = tour.synonyms[id]; // translate possibly
-                  return <h2 id={id}>{children}</h2>;
+              a : ({node, children }) => {
+                // set target = '_blank' for external links, but keep to this tab for internal links
+                const url = node.properties.href;
+                let target = '_blank';
+                if (url.startsWith('http') && !url.includes(window.location.hostname)){
+                  target = '_blank';
                 }
-              },
-              h3: ({ node, children }) => { // set ID to allow scrolling to heading
-                if (children.type === 'a'){
-                  let id = children.props.children.toLowerCase().replace(/\s+/g, '');
-                  if (id in tour.synonyms) id = tour.synonyms[id]; // translate possibly
-                  const url = children.props.href;
-                  return <h2 id={id}><a href={url}>{children}</a></h2>;
-                } else {
-                  let id = children.toLowerCase().replace(/\s+/g, '');
-                  if (id in tour.synonyms) id = tour.synonyms[id]; // translate possibly
-                  return <h2 id={id}>{children}</h2>;
+                else if (url.startsWith('#')){
+                  target = '_self';
                 }
+                else if (url.startsWith('/')){
+                  target = '_self';
+                } else if (url.startsWith('.')){
+                  target= '_self';
+                }
+                return (
+                  <a href={url} target={target} rel="noopener noreferrer">{children}</a>
+                );
               },
               img : ({node, children } ) => { // set size and add alt-text as figure caption
                 return (
-                  <figure style={{textAlign:"center"}} >
-                    <img src={node.properties.src} style={{maxWidth:"100%"}} />
+                  <figure style={{textAlign:"justify"}} >
+                    <a href={node.properties.src} target="_blank" rel="noopener noreferrer"><img src={node.properties.src} style={{maxWidth:"100%"}} /></a>
                     <figcaption><em>{node.properties.alt}</em></figcaption>
                   </figure>
                   );
