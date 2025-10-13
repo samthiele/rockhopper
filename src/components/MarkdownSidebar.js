@@ -72,12 +72,14 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
   const textareaRef = useRef(null);
   
   // load md files
-  let tabs;
-  tabs = {...tour.sites[ site ].tabs, ...tour.tabs};
-  let gkeys = Object.keys(tour.tabs); // "global" tabs
-  let lkeys = Object.keys(tour.sites[site].tabs); // site-specific tabs
-  if (tour.tabs._order) gkeys = tour.tabs._order; // order is specified
-  if (tour.sites[site].tabs._order) lkeys = tour.sites[site].tabs._order; // order is specified
+  let siteTabs = tour.sites[site].tabs || {}; // handle case where tour.sites[site].tabs is undefined
+  let globalTabs = tour.tabs || {}; // handle case where tour.tabs is undefined
+  let tabs = { ...siteTabs, ...globalTabs }; // all tabs
+  let gkeys = Object.keys(globalTabs); // global tab names
+  let lkeys = Object.keys(siteTabs); // local tab names
+
+  if (globalTabs._order) gkeys = globalTabs._order; // order is specified
+  if (siteTabs._order) lkeys = siteTabs._order; // order is specified
   const tabNames = [...lkeys, ...gkeys]; // all keys
   useEffect(() => {
     async function loadMD(){

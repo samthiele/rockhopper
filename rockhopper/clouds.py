@@ -205,7 +205,7 @@ def exportZA(points, zarr_store_path,
 
         # randomly select the first chunk (this should be evenly distributed)
         # (and inject into cids)
-        cid[ np.random.choice(len(points), chunk_size, replace=False) ] = 0 
+        cid[ np.random.choice(len(points), int(chunk_size), replace=False) ] = 0 
         ixx = np.unique(cid) # get unique classes
 
     # define colors json object defining visualisation options
