@@ -1,0 +1,19 @@
+{
+"annotURL": "./annotations.json",
+"cloudURL": "https://samthiele.github.io/rockhopper/demo_clouds",
+"languages": ["en","es","de"],
+"tabs": {
+    "Notes": ["./md/notes_en.md"],
+    "References": ["./md/references_en.md"],
+    "Help": ["./md/help_en.md"],
+    "About": ["./md/about_en.md","./md/about_es.md","./md/about_de.md"]  },
+"synonyms": {
+    "start": "site1"  },
+"sites": {
+    "site1": {
+        "mediaType": "photosphere",
+        "mediaURL": "./img/site1/ps.jpg"  },
+    "site2": {
+        "mediaType": "cloud",
+        "mediaURL": "Penguin.zarr",
+        "pointSize": 0.01  }  }  }
