@@ -46,19 +46,39 @@
             "pos": [8.97291864221492,-3.055534009764471,-3.18597598160513],
             "tgt": [0,0,0]  }  },
     "clouds": {
-        "mediaType": "cloud",
-        "mediaURL": "Penguin.zarr",
-        "pointSize": 0.01,
-        "view": {
-            "pos": [1.3791489981651144,-4.897177357119292,-0.3901283082600894],
-            "tgt": [-0.07684811458808041,-0.4996073659605804,-0.3485529156767414]  },
         "labels": {
             "label1": {
                 "html": "60 cm wingspan",
                 "pos": [0.1446579826474176,-0.9306759905452672,-0.6649694915454482]  },
             "label2": {
                 "html": "45 to 60 cm tall",
-                "pos": [-0.5147439324405843,0.04506328855519158,-0.5988797229267602]  }  }  },
+                "pos": [-0.5147439324405843,0.04506328855519158,-0.5988797229267602]  },
+            "label3": {
+                "html": "<a href='./#start'>Back to South Pole</a>",
+                "pos": [0.8466405209715434,-2.346344467438102,-0.3975164174826747]  }  },
+        "mediaType": "cloud",
+        "mediaURL": "Penguin.zarr",
+        "pointSize": 0.01,
+        "tabs": {
+            "Clouds": ["./md/clouds/clouds_en.md","./md/clouds/clouds_es.md","./md/clouds/clouds_de.md"]  },
+        "view": {
+            "pos": [1.3791489981651144,-4.897177357119292,-0.3901283082600894],
+            "tgt": [-0.07684811458808041,-0.4996073659605804,-0.3485529156767414]  }  },
+    "hosting": {
+        "labels": {
+            "label1": {
+                "html": "<a href='./#start'>Back to Start</a>",
+                "pos": [88.00664722541825,-0.39612788505187263,-45.56006140677459]  },
+            "label4": {
+                "html": "<a href='./#hosting'>5. Hosting</a>",
+                "pos": [95.30044012548358,0.0677445020932413,-27.266514672535752]  }  },
+        "mediaType": "photosphere",
+        "mediaURL": "./img/site1/ps.jpg",
+        "tabs": {
+            "Hosting": ["./md/hosting/hosting_en.md","./md/hosting/hosting_es.md","./md/hosting/hosting_de.md"]  },
+        "view": {
+            "pos": [-9.667918165027164,-2.359209027272198,0.9825940769094379],
+            "tgt": [0,0,0]  }  },
     "markdown": {
         "labels": {
             "label1": {
@@ -105,11 +125,17 @@
                 "pos": [-98.55691455913562,6.467017509780906,8.362101712789695]  },
             "label3": {
                 "html": "<a href=\"./#multimedia\">3. Multimedia</a>",
-                "pos": [-31.380652085321294,2.9517505846811236,-93.99453431911786]  }  },
+                "pos": [-31.380652085321294,2.9517505846811236,-93.99453431911786]  },
+            "label4": {
+                "html": "<a href='./#hosting'>5. Hosting</a>",
+                "pos": [95.30044012548358,0.0677445020932413,-27.266514672535752]  },
+            "label5": {
+                "html": "<a href='./#clouds'>4. Point clouds</a>",
+                "pos": [27.39108414765349,-1.30799888668479,-95.21749680141637]  }  },
         "mediaType": "photosphere",
         "mediaURL": "./img/site1/ps.jpg",
         "view": {
-            "pos": [-6.28692038135071,-1.1302714464670842,-7.693966374754806],
+            "pos": [5.958244238363092,-4.074977498663532,-6.920540728974797],
             "tgt": [0,0,0]  }  },
     "site2": {
         "mediaType": "cloud",
@@ -121,6 +147,7 @@
 "synonyms": {
     "annotations": "annotations",
     "clouds": "clouds",
+    "hosting": "hosting",
     "markdown": "markdown",
     "multimedia": "multimedia",
     "site1": "site1",
@@ -128,7 +155,7 @@
     "start": "site1"  },
 "tabs": {
     "Help": ["./md/help_en.md","./md/help_es.md","./md/help_de.md"],
+    "Index": ["./md/index_en.md","./md/index_es.md","./md/index_de.md"],
     "Notebook": ["./md/notes_en.md","./md/notes_es.md","./md/notes_de.md"],
-    "Overview": ["./md/overview_en.md","./md/overview_es.md","./md/overview_de.md"],
     "References": ["./md/references_en.md","./md/references_es.md","./md/references_de.md"],
-    "_order": ["Overview","Help","Notebook","References"]  }  }
+    "_order": ["Index","Help","Notebook","References"]  }  }
