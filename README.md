@@ -24,6 +24,8 @@ To see what RockHopper can do, please see the virtual field trip we have created
 
 [Introduction Tutorial](https://github.com/samthiele/rockhopper/blob/main/examples/tutorial.ipynb)
 
+This Jupyter Notebook should be viewed in parallel to the [tutorial VFT](https://samthiele.github.io/rockhopper/demo_tour/#start) explaining how *rockhopper* VFTs can be edited through a web browser during development mode. 
+
 **Deployment**. Once a RockHopper field trip has been developed locally, it can be uploaded onto any static web server for public access. One way to do this is to upload the streamable zarr data (stored in the `cloud_path` specified during VFT creation) to file storage like [Google Cloud](https://cloud.google.com/), and then build a GitHub pages site to host the markdown and json content defining the VFT (stored in the `vft_path` defined during VFT creation). This uses GitHub for free web hosting, and - better still - allows community driven VFTs that are open-source and can be easily adapted for different purposes. Alternatively, the zarr data, markdown and json files can all be hosted on a single web server.
 
 See the introduction tutorial above for more details on deployment.
@@ -34,9 +36,11 @@ If you have used RockHopper to create a VFT, please let us know about it in the 
 
 And if you're looking for inspiration, check out some of these tours:
 
-- [Magma plumbing systems on La Palma, Spain](https://github.com/samthiele/rockhopper/blob/main/examples/LaPalma.ipynb)
+- [Rockhopper VFT tutorial](https://samthiele.github.io/rockhopper/demo_tour/#start) - A VFT to teach you how to build *rockhopper* VFTs. Very meta!
 
-- [Hyperspectral mapping at Roșia Poieni, Romaina](https://sandralorenz268.github.io/#start)
+- [Magma plumbing systems on La Palma, Spain](https://github.com/samthiele/rockhopper/blob/main/examples/LaPalma.ipynb) - learn all about the volcanic history of La Palma (Canary Islands). 
+
+- [Hyperspectral mapping at Roșia Poieni, Romaina](https://sandralorenz268.github.io/#start) - see some different 3D hyperspectral data products created for a porphyry copper mine in Romania.
 
 ### Why point clouds?
 
