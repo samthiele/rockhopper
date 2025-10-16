@@ -1,0 +1,134 @@
+{
+"annotURL": "./annotations.json",
+"cloudURL": "UPDATE_HERE_WHEN_UPLOADED",
+"languages": ["en","es","de"],
+"sites": {
+    "annotations": {
+        "labels": {
+            "label1": {
+                "html": "<a href=\"./#start\">Back to Start</a>",
+                "pos": [-89.3070683603627,6.453969682108973,42.48475772223648]  },
+            "label10": {
+                "html": "Double click to delete an annotation",
+                "pos": [-90.0616752731552,35.67709179092396,-20.960379560959208]  },
+            "label11": {
+                "html": "<a href='./#start'>\n<img src=\"/icon/hopper_64.png\" style=\"width:32px\"/>\n</a>",
+                "pos": [-78.86555063047108,7.067577531112685,59.661385424993775]  },
+            "label2": {
+                "html": "<a href=\"./#annotations\">Annotations</a>",
+                "pos": [-98.55691455913562,6.467017509780906,8.362101712789695]  },
+            "label3": {
+                "html": "<a href=\"./#multimedia\">To Next Site</a>",
+                "pos": [-96.50527228671972,6.220067832299003,-21.84307072323283]  },
+            "label4": {
+                "html": "<figure>\n  <img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Heic1311a.jpg/1280px-Heic1311a.jpg\" style=\"width: 256px;\">\n  <figcaption>Searching deep space for the penguin and egg galaxy</figcaption>\n</figure>",
+                "pos": [-56.109413773298705,56.62256517828315,58.90661954121005]  },
+            "label5": {
+                "html": "Three points make a plane",
+                "pos": [-94.21342748718197,-18.104986450572337,24.63859403537972]  },
+            "label6": {
+                "html": "Use cmd+left click to add annotations (and enter to finish annotating)",
+                "pos": [-71.86679975051389,65.78913125665107,18.241135036009137]  },
+            "label7": {
+                "html": "A single point adds a label or html element",
+                "pos": [-76.45129294868282,60.0955467012539,19.145899885627664]  },
+            "label8": {
+                "html": "two or more points creates a polyline",
+                "pos": [-82.61346386488106,53.749674587696425,10.548428939428128]  },
+            "label9": {
+                "html": "exactly three points defines a plane (disk)",
+                "pos": [-87.2262484077193,46.77615530366972,4.652058154293568]  }  },
+        "mediaType": "photosphere",
+        "mediaURL": "./img/site1/ps.jpg",
+        "tabs": {
+            "Annotations": ["./md/annotations/annotations_en.md","./md/annotations/annotations_es.md","./md/annotations/annotations_de.md"]  },
+        "view": {
+            "pos": [8.97291864221492,-3.055534009764471,-3.18597598160513],
+            "tgt": [0,0,0]  }  },
+    "clouds": {
+        "mediaType": "cloud",
+        "mediaURL": "Penguin.zarr",
+        "pointSize": 0.01,
+        "view": {
+            "pos": [1.3791489981651144,-4.897177357119292,-0.3901283082600894],
+            "tgt": [-0.07684811458808041,-0.4996073659605804,-0.3485529156767414]  },
+        "labels": {
+            "label1": {
+                "html": "60 cm wingspan",
+                "pos": [0.1446579826474176,-0.9306759905452672,-0.6649694915454482]  },
+            "label2": {
+                "html": "45 to 60 cm tall",
+                "pos": [-0.5147439324405843,0.04506328855519158,-0.5988797229267602]  }  }  },
+    "markdown": {
+        "labels": {
+            "label1": {
+                "html": "<a href='./#start'>Back to start</a>",
+                "pos": [45.592517878879164,-2.36613807985176,87.90199288156992]  },
+            "label2": {
+                "html": "<a href=\"./#markdown\">Markdown</a>",
+                "pos": [11.809260346933964,3.099366118514229,98.3545036066929]  },
+            "label3": {
+                "html": "<a href=\"./#annotations\">To Next Site</a>",
+                "pos": [-16.56666059402157,-4.136808654083575,97.55970111786766]  }  },
+        "mediaType": "photosphere",
+        "mediaURL": "./img/site1/ps.jpg",
+        "tabs": {
+            "Markdown": ["./md/markdown/markdown_en.md","./md/markdown/markdown_es.md","./md/markdown/markdown_de.md"]  },
+        "view": {
+            "pos": [-1.4606746240318298,0.2350027341783439,-9.889954669139694],
+            "tgt": [0,0,0]  }  },
+    "multimedia": {
+        "labels": {
+            "label1": {
+                "html": "<a href=\"./#start\">Back to Start</a>",
+                "pos": [-54.23000454734939,3.2141035333664507,-82.81022813100357]  },
+            "label2": {
+                "html": "<a href=\"./#multimedia\">Multimedia</a>",
+                "pos": [-31.380652085321294,2.9517505846811236,-93.99453431911786]  },
+            "label3": {
+                "html": "<a href='./#clouds'>To Next Site</a>",
+                "pos": [-9.925340940252093,2.1321430476730967,-98.64699508261342]  }  },
+        "mediaType": "photosphere",
+        "mediaURL": "./img/site1/ps.jpg",
+        "tabs": {
+            "Multimedia": ["./md/multimedia/multimedia_en.md","./md/multimedia/multimedia_es.md","./md/multimedia/multimedia_de.md"]  },
+        "view": {
+            "pos": [4.5904125669214455,-1.285764070505752,8.790615633756673],
+            "tgt": [0,0,0]  }  },
+    "site1": {
+        "labels": {
+            "label1": {
+                "html": "<a href=\"./#markdown\">1. Markdown</a>",
+                "pos": [11.809260346933964,3.099366118514229,98.3545036066929]  },
+            "label2": {
+                "html": "<a href=\"./#annotations\">2. Annotations</a>",
+                "pos": [-98.55691455913562,6.467017509780906,8.362101712789695]  },
+            "label3": {
+                "html": "<a href=\"./#multimedia\">3. Multimedia</a>",
+                "pos": [-31.380652085321294,2.9517505846811236,-93.99453431911786]  }  },
+        "mediaType": "photosphere",
+        "mediaURL": "./img/site1/ps.jpg",
+        "view": {
+            "pos": [-6.28692038135071,-1.1302714464670842,-7.693966374754806],
+            "tgt": [0,0,0]  }  },
+    "site2": {
+        "mediaType": "cloud",
+        "mediaURL": "Penguin.zarr",
+        "pointSize": 0.01,
+        "view": {
+            "pos": [1.3791489981651084,-4.8971773571193715,-0.39012830826009026],
+            "tgt": [-0.07684811458808041,-0.4996073659605804,-0.3485529156767414]  }  }  },
+"synonyms": {
+    "annotations": "annotations",
+    "clouds": "clouds",
+    "markdown": "markdown",
+    "multimedia": "multimedia",
+    "site1": "site1",
+    "site2": "site2",
+    "start": "site1"  },
+"tabs": {
+    "Help": ["./md/help_en.md","./md/help_es.md","./md/help_de.md"],
+    "Notebook": ["./md/notes_en.md","./md/notes_es.md","./md/notes_de.md"],
+    "Overview": ["./md/overview_en.md","./md/overview_es.md","./md/overview_de.md"],
+    "References": ["./md/references_en.md","./md/references_es.md","./md/references_de.md"],
+    "_order": ["Overview","Help","Notebook","References"]  }  }

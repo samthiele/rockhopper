@@ -1,0 +1,198 @@
+{
+  "annotURL": "./annotations.json",
+  "cloudURL": "https://storage.googleapis.com/rockhopper",
+  "languages": [
+    "en",
+    "de"
+  ],
+  "sites": {
+    "site1": {
+      "labels": {
+        "beach": {
+          "html": "<a href='./#/site4'>Go to the beach</a>",
+          "pos": [
+            92,
+            56,
+            -36
+          ]
+        },
+        "mountains": {
+          "html": "<a href='./#/site3'>Go to the mountains</a>",
+          "pos": [
+            88,
+            64,
+            -26
+          ]
+        },
+        "site2": {
+          "html": "<a href='./#/site2'>View Site 2</a>",
+          "pos": [
+            76,
+            47,
+            -29
+          ]
+        }
+      },
+      "mediaType": "cloud",
+      "mediaURL": "dolomites.zarr",
+      "pointSize": 0.1,
+      "tabs": {
+        "Guide": [
+          "./md/guide_en.md",
+          "./md/guide_de.md"
+        ]
+      },
+      "view": {
+        "group": "none",
+        "pos": [
+          80,
+          -15,
+          27
+        ],
+        "style": "rgb",
+        "tgt": [
+          54,
+          48,
+          -16
+        ]
+      }
+    },
+    "site2": {
+      "labels": {
+        "label2": {
+          "html": "<div>I found some rocks here</div><img src='https://upload.wikimedia.org/wikipedia/commons/4/41/Pet_rock.jpg' width='150px'>",
+          "pos": [
+            -59.87624383268876,
+            -73.49592494715247,
+            -5.8645897262034055
+          ]
+        },
+        "site1": {
+          "html": "<a href='./#/site1'>View Site 1</a>",
+          "pos": [
+            -99,
+            -99,
+            19
+          ]
+        }
+      },
+      "mediaType": "cloud",
+      "mediaURL": "dolomites.zarr",
+      "pointSize": 0.1,
+      "tabs": {
+        "Guide": [
+          "./md/guide_en.md",
+          "./md/guide_de.md"
+        ]
+      },
+      "view": {
+        "group": "dolomite",
+        "pos": [
+          -79,
+          -132,
+          40
+        ],
+        "style": "carbonate",
+        "tgt": [
+          -91,
+          -81,
+          24
+        ]
+      }
+    },
+    "site3": {
+      "labels": {
+        "outcrop": {
+          "html": "<a href='./#/site1'>Go to outcrop</a>",
+          "pos": [
+            31,
+            22,
+            91
+          ]
+        },
+        "label2": {
+          "html": "Massive mountain!",
+          "pos": [
+            -18.519732028490427,
+            71.84309624156354,
+            -66.87588734992849
+          ]
+        },
+        "label3": {
+          "html": "Last glacier in the alps...",
+          "pos": [
+            16.237708258112097,
+            -27.98530828167576,
+            94.41901114817101
+          ]
+        }
+      },
+      "mediaType": "photosphere",
+      "mediaURL": "./photosphere/pano_small.jpg",
+      "tabs": {
+        "Guide": [
+          "./md/guide_en.md",
+          "./md/guide_de.md"
+        ]
+      },
+      "view": {
+        "pos": [
+          -1.6836,
+          -3.1561,
+          -9.338
+        ],
+        "tgt": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "site4": {
+      "labels": {
+        "outcrop": {
+          "html": "<a href='./#/site1'>Back to the mountains</a>",
+          "pos": [
+            1725,
+            -15143,
+            1919
+          ]
+        }
+      },
+      "mediaType": "cloud",
+      "mediaURL": "LaPalma.zarr",
+      "pointSize": 10,
+      "tabs": {
+        "Guide": [
+          "./md/guide_en.md",
+          "./md/guide_de.md"
+        ]
+      }
+    }
+  },
+  "synonyms": {
+    "site1": "site1",
+    "site2": "site2",
+    "site3": "site3",
+    "site4": "site4",
+    "standort1": "site1",
+    "standort2": "site2",
+    "standort3": "site3",
+    "start": "site1"
+  },
+  "tabs": {
+    "_order" : ["Notebook","References","Help"],
+    "Help": [
+      "./md/help_en.md",
+      "./md/help_de.md"
+    ],
+    "Notebook": [
+      "./md/notes_en.md",
+      "./md/notes_de.md"
+    ],
+    "References": [
+      "./md/references_en.md",
+      "./md/references_de.md"
+    ]
+  }
+}

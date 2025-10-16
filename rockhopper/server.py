@@ -251,9 +251,10 @@ class VFT(object):
             self.index = {"annotURL": "./annotations.json",
                           "cloudURL": "UPDATE_HERE_WHEN_UPLOADED",
                           "languages" : ['en'],
-                          "tabs" : {"Notes":["./md/notes_en.md"],
+                          "tabs" : {"Notebook":["./md/notes_en.md"],
                                     "References":["./md/references_en.md"],
-                                    "Help":["./md/help_en.md"]},
+                                    "Help":["./md/help_en.md"],
+                                    "_order":["Help","Notebook","References"]},
                           "synonyms" : {},
                           "sites":{},
                           }
