@@ -1,6 +1,6 @@
 ### About Markdown
 
-Markdown files are used to store the rich-text content in RockHopper tours. You can edit these using any text editor (e.g., see [here](https://github.com/samthiele/rockhopper/blob/main/public/demo_tour/md/about_en.md) to see the raw file). Or, better still, if you run a tour locally using a development server then the files will be editable in the web-browser:
+Markdown files are used to store the rich-text content in RockHopper tours. You can edit these using any text editor (e.g., see [here](https://github.com/samthiele/rockhopper/blob/main/demo/demo_tour/md/about_en.md) to see the raw file). Or, better still, if you run a tour locally using a development server then the files will be editable in the web-browser:
  - `double-click` a tab to see and edit the corresponding markdown
  - then press `Shift+Enter` to update the underlying file and render it
 

@@ -1,6 +1,6 @@
 {
 "annotURL": "./annotations.json",
-"cloudURL": "UPDATE_HERE_WHEN_UPLOADED",
+"cloudURL": "https://samthiele.github.io/rockhopper/demo_clouds",
 "languages": ["en","es","de"],
 "sites": {
     "annotations": {
