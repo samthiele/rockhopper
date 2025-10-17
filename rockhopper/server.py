@@ -378,8 +378,126 @@ class VFT(object):
         Keywords
         ---------
         All keywords are passed directly to `rockhopper.exportZA(...)`. These should be used
-        to e.g., define visualisation styles, highlights and/or masks. 
+        to e.g., define visualisation styles, highlights and/or masks.  Most important are the following
+
+        stylesheet : dict
+            A dictionary defining **visualization styles** for point cloud rendering. Each key
+            corresponds to a named style that can be selected in the viewer, allowing the user
+            to toggle between different colour representations (e.g., RGB, elevation, intensity,
+            or derived attributes).
+
+            Each style entry defines how point colours are computed. Supported formats include:
+
+            1. **Ternary (true colour) mapping**  
+            A mapping that combines three attributes (bands) into the red, green, and blue
+            channels respectively.  
+            Example format:
+                {'color': {'R': (iR, minR, maxR),
+                            'G': (iG, minG, maxG),
+                            'B': (iB, minB, maxB)}}
+            where each tuple `(index, min_value, max_value)` defines which attribute band to use
+            and how to normalize it into the `[0, 1]` display range.
+
+            2. **Colour ramp mapping**  
+            A mapping that applies a continuous colour ramp (scale) to a single attribute band.  
+            Example format:
+                {'color': (index, {'scale': <str or list>, 'limits': (vmin, vmax, nsteps)})}
+            - `index`: The attribute index to use (e.g., 2 for elevation).  
+            - `scale`: A colour ramp or list of colour names passed to the JavaScript
+                `chroma.scale(...)` function (e.g., `'viridis'`, `'spectral'`, `'RdYlBu'`).  
+            - `limits`: The `(min, max, nsteps)` defining the colour domain and the number
+                of intervals used in the ramp. These values are passed to `chroma.limits(...)`.
+
+            Default
+            -------
+            If no stylesheet is provided, a default configuration is used:
+            ```
+            {
+                'rgb': {'color': {'R': (3, 0, 1),
+                                'G': (4, 0, 1),
+                                'B': (5, 0, 1)}},
+                'elev': {'color': (2, {'scale': 'viridis',
+                                    'limits': (-100, 100, 255)})}
+            }
+            ```
+
+            Example
+            -------
+            >>> stylesheet = {
+            ...     'rgb': {
+            ...         'color': {
+            ...             'R': (3, 0, 1),   # Use band 3 as red (satellite RGB)
+            ...             'G': (4, 0, 1),   # Use band 4 as green
+            ...             'B': (5, 0, 1)    # Use band 5 as blue
+            ...         }
+            ...     },
+            ...     'rainbow': {
+            ...         'color': (
+            ...             1,  # Map the second attribute (e.g., y-coordinate)
+            ...             {'scale': 'spectral', 'limits': (-2, 2, 255)}  # Spectral colour ramp with 255 steps
+            ...         )
+            ...     }
+            ... }
+
+            In this example, the viewer exposes two selectable styles:
+            - **'rgb'** renders the point cloud using its true RGB values.
+            - **'rainbow'** colours points using a continuous ramp based on their second attribute
+            (in this case, the y-coordinate), with values from -2 to 2 mapped through a
+            "spectral" colour scale.
+
+        groups : dict
+            A dictionary defining **highlighting** and **masking groups** for interactive
+            visualization of point clouds. Each key creates a toggle button in the front-end
+            that can either highlight or mask points according to a logical condition on a
+            given attribute (band).
+
+            Each group entry is a dictionary containing one or more of the following keys:
+
+            - **"blend"** : float  
+                The strength of the colour overlay (from 0 to 1). Controls how strongly
+                the highlight colour blends with the base colour.
+            
+            - **"color"** : list of float  
+                The RGB triplet `[R, G, B]` to use for highlighting when the group is activated.
+                Each channel should be in the range `[0, 1]`.
+            
+            - **"iq"** : list  
+                A logical condition in the form `[index, operator, value]` that determines
+                which points to highlight.  
+                - `index` is the attribute index (e.g., `6` for the 7th attribute).  
+                - `operator` is a string such as `'='`, `'!='`, `'>'`, `'<'`, etc.  
+                - `value` is the scalar value to compare against.
+                Example: `[6, '=', 3]` highlights points where the 7th attribute equals 3.
+            
+            - **"mask"** : list  
+                A logical condition `[index, operator, value]` defining which points to **hide**
+                when the group is active. For example, `[6, '!=', 0]` hides all points whose
+                7th attribute is not equal to zero.
+
+                Example
+                -------
+                >>> groups = {
+                ...     "wings": {
+                ...         "blend": 0.3,
+                ...         "color": [1, 1, 0],
+                ...         "iq": [6, '=', 3]
+                ...     },
+                ...     "legs": {
+                ...         "blend": 0.3,
+                ...         "color": [1, 1, 0],
+                ...         "iq": [6, '=', 1]
+                ...     },
+                ...     "body": {
+                ...         "blend": 0.3,
+                ...         "color": [1, 1, 0],
+                ...         "iq": [6, '=', 2]
+                ...     },
+                ...     "skeleton": {
+                ...         "mask": [6, '!=', 0]
+                ...     }
+                ... }
         """
+        
         if cloud is not None:
             assert self.cloud_path is not None, "Create a VFT with a `cloud_path` to add local cloud streams."
             if isinstance(cloud, str) or isinstance(cloud, Path):

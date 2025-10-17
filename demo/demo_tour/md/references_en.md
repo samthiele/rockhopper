@@ -10,5 +10,5 @@ The beautiful photosphere comes from the South Pole observatory in Antarctica. C
 
 (having a look at the original high-resolution version of this photosphere is highly reccomended).
 
-The 3D penguin Rock Hopper penguin is from [Sketchfab](https://sketchfab.com/3d-models/rockhopper-penguin-a3866027d797445c9188cd4e05798320).  
+The 3D Rock Hopper penguin is from [Sketchfab](https://sketchfab.com/3d-models/rockhopper-penguin-a3866027d797445c9188cd4e05798320).  
 

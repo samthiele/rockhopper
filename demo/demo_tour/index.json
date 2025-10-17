@@ -12,7 +12,7 @@
                 "html": "Double click to delete an annotation",
                 "pos": [-90.0616752731552,35.67709179092396,-20.960379560959208]  },
             "label11": {
-                "html": "<a href='./#start'>\n<img src=\"/icon/hopper_64.png\" style=\"width:32px\"/>\n</a>",
+                "html": "<a href='./#start'>\n<img src=\"./icon/hopper_64.png\" style=\"width:32px\"/>\n</a>",
                 "pos": [-78.86555063047108,7.067577531112685,59.661385424993775]  },
             "label2": {
                 "html": "<a href=\"./#annotations\">Annotations</a>",
