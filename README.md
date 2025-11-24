@@ -40,6 +40,8 @@ And if you're looking for inspiration, check out some of these tours:
 
 - [Magma plumbing systems on La Palma, Spain](https://github.com/samthiele/rockhopper/blob/main/examples/LaPalma.ipynb) - learn all about the volcanic history of La Palma (Canary Islands). 
 
+- [Epithermal silver veins of the Freiberg district, Germany](https://samthiele.github.io/freibergVFT/fg_tour/#start) - explore historic silver mines of the Freiberg region.
+
 - [Hyperspectral mapping at Roșia Poieni, Romaina](https://sandralorenz268.github.io/#start) - see some different 3D hyperspectral data products created for a porphyry copper mine in Romania.
 
 ### Why point clouds?
