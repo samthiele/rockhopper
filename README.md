@@ -38,7 +38,7 @@ And if you're looking for inspiration, check out some of these tours:
 
 - [Rockhopper VFT tutorial](https://samthiele.github.io/rockhopper/demo_tour/#start) - A VFT to teach you how to build *rockhopper* VFTs. Very meta!
 
-- [Magma plumbing systems on La Palma, Spain](https://github.com/samthiele/rockhopper/blob/main/examples/LaPalma.ipynb) - learn all about the volcanic history of La Palma (Canary Islands). 
+- [Magma plumbing systems on La Palma, Spain](https://samthiele.github.io/LaPalmaVFT/#/start) - learn all about the volcanic history of La Palma (Canary Islands). 
 
 - [Epithermal silver veins of the Freiberg district, Germany](https://samthiele.github.io/freibergVFT/fg_tour/#start) - explore historic silver mines of the Freiberg region.
 
