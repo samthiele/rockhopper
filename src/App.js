@@ -3,6 +3,15 @@ import { HashRouter as Router, Routes, Route, useParams, Navigate } from 'react-
 import Hopper from './components/Hopper';
 
 const App = () => {
+  //analytics
+  useEffect(() => {
+    const url = new URL("https://app-analytics.my-app-logs.workers.dev");
+    url.searchParams.set("app", "rockhopper");
+    url.searchParams.set( "page",
+      `${window.location.origin}${window.location.pathname}` );
+    fetch(url, { mode: "cors", keepalive: true }).catch(() => {});
+  }, []);
+  
   // load index json file
   const [loading, setLoading] = useState(true);
   const tour = useRef(null);
