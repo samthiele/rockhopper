@@ -7,8 +7,11 @@ const App = () => {
   useEffect(() => {
     const url = new URL("https://app-analytics.my-app-logs.workers.dev");
     url.searchParams.set("app", "rockhopper");
-    url.searchParams.set( "page",
-      `${window.location.origin}${window.location.pathname}` );
+    url.searchParams.set(
+      "page",
+      `${window.location.origin}${window.location.pathname}`
+    );
+    url.searchParams.set("referrer", document.referrer || "");
     fetch(url, { mode: "cors", keepalive: true }).catch(() => {});
   }, []);
   
