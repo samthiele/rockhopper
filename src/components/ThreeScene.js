@@ -5,9 +5,11 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+import { disposeObject3D, disposeSceneContents } from './dispose3d';
 import './ThreeScene.css';
 
 const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+sphereMaterial.userData.shared = true;
 
 const download = (text, filename, type) => {
     // build a blob ready to download
@@ -85,6 +87,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             }
             three.current.camera.fov = Math.max(40, Math.min(100, three.current.camera.fov));
             three.current.camera.updateProjectionMatrix();
+            if (three.current.invalidate) three.current.invalidate();
         }
         if (fixCamera){
             three.current.controls.screenSpacePanning = false;
@@ -101,28 +104,51 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             three.current.labelRenderer.setSize(mount.clientWidth, mount.clientHeight);
             three.current.camera.aspect = mount.clientWidth / mount.clientHeight;
             three.current.camera.updateProjectionMatrix();
-            three.current.controls.update();
+            if (three.current.invalidate) three.current.invalidate();
         };
         window.addEventListener("resize", handleResize);
+
+        // Render only when the camera moves, damping is settling, or someone calls invalidate()
+        let rafId = 0;
+        const tick = () => {
+            const damping = three.current.controls.update();
+            three.current.renderer.render(three.current.scene, three.current.camera);
+            three.current.labelRenderer.render(three.current.scene, three.current.camera);
+            if (damping) {
+                rafId = requestAnimationFrame(tick);
+            } else {
+                rafId = 0;
+            }
+        };
+        const invalidate = () => {
+            if (rafId !== 0) return;
+            rafId = requestAnimationFrame(tick);
+        };
+        three.current.invalidate = invalidate;
+        three.current.controls.addEventListener('start', invalidate);
+        three.current.controls.addEventListener('change', invalidate);
                 
         // setup complete!
         console.log("Three.js setup complete.");
         setInit(true);
-
-        // Animation loop
-        const animate = () => {
-            requestAnimationFrame(animate);
-            three.current.controls.update();
-            three.current.renderer.render(three.current.scene, three.current.camera);
-            three.current.labelRenderer.render(three.current.scene, three.current.camera);
-        };
-        animate();
+        invalidate();
 
         return () => {
+            if (rafId) cancelAnimationFrame(rafId);
+            three.current.invalidate = () => {};
+            three.current.controls.removeEventListener('start', invalidate);
+            three.current.controls.removeEventListener('change', invalidate);
             window.removeEventListener("resize", handleResize);
             mount.removeEventListener('mousewheel', onMouseWheel);
             mount.removeEventListener('DOMMouseScroll', onMouseWheel);
-            mount.removeChild(three.current.renderer.domElement);
+            disposeSceneContents(three.current.scene);
+            if (three.current.labelRenderer && three.current.labelRenderer.domElement.parentNode) {
+                mount.removeChild(three.current.labelRenderer.domElement);
+            }
+            if (three.current.renderer && three.current.renderer.domElement.parentNode) {
+                mount.removeChild(three.current.renderer.domElement);
+            }
+            three.current.renderer.dispose();
             three.current.controls.dispose();
           };
     }, [fixCamera]);
@@ -130,10 +156,13 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
     // handle changes in site (clear scene contents)
     useEffect(()=>{
         if (currentMedia && three.current.scene){
-            for( var i = three.current.scene.children.length - 1; i >= 0; i--) { 
-                three.current.scene.remove(three.current.scene.children[i]); 
-            }
+            disposeSceneContents(three.current.scene);
+            if (three.current.invalidate) three.current.invalidate();
         }
+        spheresRef.current = [];
+        lineRef.current = [];
+        planeRef.current = [];
+        labelRef.current = [];
         setSelection([]);
         // clear any (accidentally) remaining labels
         document.querySelectorAll('.outerdiv').forEach( (l)=>{
@@ -232,6 +261,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                     if (!tour.sites[site].labels) tour.sites[site].labels = {};
                     tour.sites[site].labels[k] = label;
                     drawLabel(txt, new THREE.Vector3(...selection[0]), k);
+                    if (three.current.invalidate) three.current.invalidate();
 
                     // send a POST that updates JSON file
                     if (tour.devURL){
@@ -316,7 +346,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         // clear previous labels
         labelRef.current.forEach( (obj) => {
             three.current.scene.remove(obj);
-            obj.children.forEach( (c) => {obj.remove(c)});
+            disposeObject3D(obj);
         } );
         labelRef.current = [];
 
@@ -330,6 +360,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 drawLabel(lab.html, new THREE.Vector3(...lab.pos), k);
             } );
         }
+        if (three.current.invalidate) three.current.invalidate();
     },[site, init, labelVis]);
     
       // ** Draw annotations **
@@ -340,37 +371,37 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         [spheresRef, lineRef, planeRef].forEach( (ref)=>{
           ref.current.forEach((obj) => {
             three.current.scene.remove(obj);
-            obj.geometry.dispose();
-            obj.material.dispose();
+            disposeObject3D(obj);
         })});
         spheresRef.current = [];
-        if (!annotVis) return; // don't draw annotations
-    
-        // Add a yellow sphere to highlight selected points
-        const sphereGeometry = new THREE.SphereGeometry(three.current.pointSize*3, 16, 16);
-        selection.forEach((point)=>{
-            const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-            sphere.position.copy(point);
-            three.current.scene.add(sphere);
-            spheresRef.current.push(sphere);
-        });
-        
-        // add current line, plane or polyline
-        if (selection.length === 2) {
-          drawLine({verts:[selection[0], selection[1]], color:annotColor});
-        } else if (selection.length === 3) {
-          drawPlane({verts:[selection[0], selection[1], selection[2]], color:annotColor});
-        } else if (selection.length > 3){
-          drawLine({verts:selection, color:annotColor});
+        lineRef.current = [];
+        planeRef.current = [];
+        if (annotVis) {
+            // Add a yellow sphere to highlight selected points
+            const sphereGeometry = new THREE.SphereGeometry(three.current.pointSize*3, 16, 16);
+            selection.forEach((point)=>{
+                const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+                sphere.position.copy(point);
+                three.current.scene.add(sphere);
+                spheresRef.current.push(sphere);
+            });
+
+            // add current line, plane or polyline
+            if (selection.length === 2) {
+              drawLine({verts:[selection[0], selection[1]], color:annotColor});
+            } else if (selection.length === 3) {
+              drawPlane({verts:[selection[0], selection[1], selection[2]], color:annotColor});
+            } else if (selection.length > 3){
+              drawLine({verts:selection, color:annotColor});
+            }
+
+            if (annotations && (site in annotations)) {
+                annotations[site].lines.forEach( (l) => { drawLine(l) } );
+                annotations[site].planes.forEach( (l) => { drawPlane(l) } );
+                annotations[site].traces.forEach( (l) => { drawLine(l) } );
+            }
         }
-        
-        if (!annotations) return;
-        if (!(site in annotations)) return;
-        
-        // add annotation lines / planes / polylines
-        annotations[site].lines.forEach( (l) => { drawLine(l) } );
-        annotations[site].planes.forEach( (l) => { drawPlane(l) } );
-        annotations[site].traces.forEach( (l) => { drawLine(l) } );
+        if (three.current.invalidate) three.current.invalidate();
       }, [site, init, selection, annotations, annotColor, annotVis]);
     
     // **Add labels **
@@ -394,6 +425,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
 
             // Remove the label from three.current.scene
             three.current.scene.remove(label);
+            if (three.current.invalidate) three.current.invalidate();
 
             // remove label from the tour
             delete tour.sites[site].labels[key];

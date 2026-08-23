@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm'
 import './MarkdownSidebar.css';
@@ -48,17 +47,153 @@ const annotToMD = (annotations) => {
   return text;
 };
 
-// Scroll MD to a specific heading
-const scrollToHeading = (id) => {
-  const element = document.getElementById(id);
-  if (element) {
-    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+function headingText(children) {
+  if (children == null) return '';
+  if (typeof children === 'string' || typeof children === 'number') return String(children);
+  if (Array.isArray(children)) return children.map(headingText).join('');
+  if (typeof children === 'object' && children.props) return headingText(children.props.children);
+  return '';
+}
+
+// Site urls are #/losandenes1b — match "Los Andenes 1b" / "losandenes1b"
+function slugifyHeading(text) {
+  return String(text).toLowerCase().normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function HeadingTag(Tag) {
+  return ({node, children, ...props}) => {
+    const id = slugifyHeading(headingText(children));
+    return <Tag id={id || undefined} {...props}>{children}</Tag>;
+  };
+}
+
+const scrollToHeading = (container, id) => {
+  if (!container || !id) return false;
+  const slug = slugifyHeading(id);
+  if (!slug) return false;
+  const match = (el) => el && (el.id === slug || slugifyHeading(el.textContent) === slug);
+  let el = null;
+  try {
+    el = container.querySelector(`[id="${CSS.escape(slug)}"]`);
+  } catch (e) {
+    el = document.getElementById(slug);
+    if (el && !container.contains(el)) el = null;
   }
+  if (!match(el)) {
+    el = null;
+    for (const h of container.querySelectorAll('h1,h2,h3,h4,h5,h6')) {
+      if (match(h)) { el = h; break; }
+    }
+  }
+  if (!el) return false;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return true;
 };
 
 const scrollToTop = (markdownRef) => {
   if (markdownRef){ markdownRef.scrollTo({ top: 0, behavior: 'smooth' }); }
 }
+
+const remarkPlugins = [remarkGfm];
+
+const markdownComponents = {
+  p: props => <div {...props} className='markdownParagraph'/>,
+  a : ({node, children }) => {
+    // set target = '_blank' for external links, but keep to this tab for internal links
+    const url = node.properties.href;
+    let target = '_blank';
+    if (url.startsWith('http') && !url.includes(window.location.hostname)){
+      target = '_blank';
+    }
+    else if (url.startsWith('#')){
+      target = '_self';
+    }
+    else if (url.startsWith('/')){
+      target = '_self';
+    } else if (url.startsWith('.')){
+      target= '_self';
+    }
+    return (
+      <a href={url} target={target} rel="noopener noreferrer">{children}</a>
+    );
+  },
+  img : ({node, children } ) => { // set size and add alt-text as figure caption
+    return (
+      <figure style={{textAlign:"justify"}} >
+        <a href={node.properties.src} target="_blank" rel="noopener noreferrer"><img src={node.properties.src} style={{maxWidth:"100%"}} /></a>
+        <figcaption><em>{node.properties.alt}</em></figcaption>
+      </figure>
+      );
+  },
+  li :({node, children}) => { //node.children[0].disabled = false;
+    if (node.children[0].type === 'element'){
+      if (node.children[0].properties.type === 'checkbox'){
+        const answer = node.children[0].properties.checked;
+        return <li className="question">
+                <input type="checkbox" onClick={(e)=>{
+                  e.target.checked = true;
+                  e.target.className = answer ? "correct" : "incorrect";
+                }}/>
+                {children.slice(1)}
+               </li>
+      }
+    }
+    return <li>{children}</li>;
+  },
+  blockquote : ({node, children}) => {
+    // unwrap blockquote command
+    const unwrap = ( cmd ) => {
+      if (Array.isArray(cmd)){
+        return cmd.map( (el) => {
+          if (el.props){
+            return unwrap(el.props.children); // React element
+          } else {
+            return el.trim(); // string
+          }
+        }).join(' ');
+      } else {
+        return cmd.trim();
+      }
+    }
+    const command = unwrap( children[1].props.children );
+    const parts = command.split(' ');
+
+    // audio?
+    if (parts[0] === 'audio' && (parts.length == 2)) {
+      const srcUrl = parts[1].trim();
+      return (
+        <div>
+          <audio controls style={{width: "100%"}}>
+            <source src={srcUrl} type="audio/mpeg"/>
+            Your browser does not support the audio element.
+          </audio>
+        </div>
+      );
+    }
+    // youtube video
+    if (parts[0] === 'youtube' && (parts.length) == 2){
+      const srcUrl = parts[1].trim();
+      return (
+        <div>
+          <iframe style={{width:"100%", height:"315px", paddingTop: "1em" }} 
+          src={srcUrl} title="Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen;" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        </div>
+      );
+    }
+    // stereonet? [ todo ]
+    
+    // not a command; return a normal block quote
+    return <blockquote>{children}</blockquote>
+  },
+  h1: HeadingTag('h1'),
+  h2: HeadingTag('h2'),
+  h3: HeadingTag('h3'),
+  h4: HeadingTag('h4'),
+  h5: HeadingTag('h5'),
+  h6: HeadingTag('h6'),
+};
 
 const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
   const [activeTab, setActiveTab] = useState('guide'); // visible tab
@@ -70,6 +205,9 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
   const [isEditing, setIsEditing] = useState(false);
   const markdownRef = useRef(null);
   const textareaRef = useRef(null);
+  const displayedUrlRef = useRef(null);
+  const scrollIntentRef = useRef('top'); // 'top' | 'keep'
+  const savedScrollRef = useRef(0);
   
   // load md files
   let siteTabs = tour.sites[site].tabs || {}; // handle case where tour.sites[site].tabs is undefined
@@ -82,34 +220,54 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
   if (siteTabs._order) lkeys = siteTabs._order; // order is specified
   const tabNames = [...lkeys, ...gkeys]; // all keys
   useEffect(() => {
+    let cancelled = false;
+    savedScrollRef.current = markdownRef.current ? markdownRef.current.scrollTop : 0;
     async function loadMD(){
-      const mdown = {...markdown}; // put fetched markdown here
-      for (const k of tabNames) {
+      const mdown = {};
+      await Promise.all(tabNames.map(async (k) => {
         const url = tabs[k][activeLanguage];
+        if (!url) return;
         if (!(url in cache.current)){
-          cache.current[url] = await fetchMarkdown( tabs[k][activeLanguage] );
-          scrollToTop(markdownRef.current); // scroll to top
-        } 
+          cache.current[url] = await fetchMarkdown(url);
+        }
         mdown[k.toLowerCase()] = {url:url, text:cache.current[url]};
-      }
-      setMarkdown( mdown ) // update MD
+      }));
+      if (cancelled) return;
+      const names = tabNames.map((k) => k.toLowerCase()).filter((k) => mdown[k]);
+      const nextTab = names.includes(activeTab) ? activeTab : names[0];
+      if (!nextTab || !mdown[nextTab]) return;
+      const nextUrl = mdown[nextTab].url;
+      scrollIntentRef.current = (nextUrl !== displayedUrlRef.current) ? 'top' : 'keep';
+      displayedUrlRef.current = nextUrl;
+      setMarkdown(mdown);
       setIsEditing(false);
-      setContent( mdown[tabNames[0].toLowerCase()].text );
-      setActiveTab(tabNames[0].toLowerCase());
+      setActiveTab(nextTab);
+      setContent(mdown[nextTab].text);
     }
     loadMD();
-    
+    return () => { cancelled = true; };
     }, [site, activeLanguage]); // depends on selected language!
 
-    // Scroll to heading if URL contains a hash
-    const params = useParams();
+    // After content is drawn: heading matching #/site, else top only if a new file loaded
     useEffect(() => {
-      if (window.location.hash) {
-        let id = params.site.toLowerCase();
-        if (id in tour.synonyms) id = tour.synonyms[id]; // translate possibly
-        //setTimeout(() => scrollToHeading(id), 50); // Delay to ensure content is loaded
-      }
-    }, [content, params]);
+      if (isEditing) return;
+      const container = markdownRef.current;
+      if (!container) return;
+      const intent = scrollIntentRef.current;
+      const saved = savedScrollRef.current;
+      let raf2 = 0;
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => {
+          if (scrollToHeading(container, site)) return;
+          if (intent === 'top') scrollToTop(container);
+          else container.scrollTop = saved;
+        });
+      });
+      return () => {
+        cancelAnimationFrame(raf1);
+        if (raf2) cancelAnimationFrame(raf2);
+      };
+    }, [content, site, isEditing]);
 
     // edit functions
     const handleDoubleClick = () => {
@@ -150,7 +308,14 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
         { tabNames.map( (k) => {
           return <button
             className={`tab ${activeTab.toLowerCase() === k.toLowerCase() ? 'active' : ''}`}
-            onClick={() => {setActiveTab(k.toLowerCase()); setContent( markdown[k.toLowerCase()].text );}}
+            onClick={() => {
+              const key = k.toLowerCase();
+              const next = markdown[key];
+              scrollIntentRef.current = (next && next.url !== displayedUrlRef.current) ? 'top' : 'keep';
+              if (next) displayedUrlRef.current = next.url;
+              setActiveTab(key);
+              setContent(next ? next.text : '');
+            }}
             key={k}
           > {k} </button>
         }) }
@@ -167,97 +332,8 @@ const MarkdownSidebar = ({tour, site, annotations, setAnnotations, three}) => {
           /> ) : ( <>
           <ReactMarkdown 
             className="markdown"
-            remarkPlugins={[remarkGfm]}
-            components={{
-              p: props => <div {...props} className='markdownParagraph'/>,
-              a : ({node, children }) => {
-                // set target = '_blank' for external links, but keep to this tab for internal links
-                const url = node.properties.href;
-                let target = '_blank';
-                if (url.startsWith('http') && !url.includes(window.location.hostname)){
-                  target = '_blank';
-                }
-                else if (url.startsWith('#')){
-                  target = '_self';
-                }
-                else if (url.startsWith('/')){
-                  target = '_self';
-                } else if (url.startsWith('.')){
-                  target= '_self';
-                }
-                return (
-                  <a href={url} target={target} rel="noopener noreferrer">{children}</a>
-                );
-              },
-              img : ({node, children } ) => { // set size and add alt-text as figure caption
-                return (
-                  <figure style={{textAlign:"justify"}} >
-                    <a href={node.properties.src} target="_blank" rel="noopener noreferrer"><img src={node.properties.src} style={{maxWidth:"100%"}} /></a>
-                    <figcaption><em>{node.properties.alt}</em></figcaption>
-                  </figure>
-                  );
-              },
-              li :({node, children}) => { //node.children[0].disabled = false;
-                if (node.children[0].type === 'element'){
-                  if (node.children[0].properties.type === 'checkbox'){
-                    const answer = node.children[0].properties.checked;
-                    return <li className="question">
-                            <input type="checkbox" onClick={(e)=>{
-                              e.target.checked = true;
-                              e.target.className = answer ? "correct" : "incorrect";
-                            }}/>
-                            {children.slice(1)}
-                           </li>
-                  }
-                }
-                return <li>{children}</li>;
-              },
-              blockquote : ({node, children}) => {
-                // unwrap blockquote command
-                const unwrap = ( cmd ) => {
-                  if (Array.isArray(cmd)){
-                    return cmd.map( (el) => {
-                      if (el.props){
-                        return unwrap(el.props.children); // React element
-                      } else {
-                        return el.trim(); // string
-                      }
-                    }).join(' ');
-                  } else {
-                    return cmd.trim();
-                  }
-                }
-                const command = unwrap( children[1].props.children );
-                const parts = command.split(' ');
-
-                // audio?
-                if (parts[0] === 'audio' && (parts.length == 2)) {
-                  const srcUrl = parts[1].trim();
-                  return (
-                    <div>
-                      <audio controls style={{width: "100%"}}>
-                        <source src={srcUrl} type="audio/mpeg"/>
-                        Your browser does not support the audio element.
-                      </audio>
-                    </div>
-                  );
-                }
-                // youtube video
-                if (parts[0] === 'youtube' && (parts.length) == 2){
-                  const srcUrl = parts[1].trim();
-                  return (
-                    <div>
-                      <iframe style={{width:"100%", height:"315px", paddingTop: "1em" }} 
-                      src={srcUrl} title="Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen;" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-                    </div>
-                  );
-                }
-                // stereonet? [ todo ]
-                
-                // not a command; return a normal block quote
-                return <blockquote>{children}</blockquote>
-              }
-            }} 
+            remarkPlugins={remarkPlugins}
+            components={markdownComponents} 
         >
           {content + (annotations && (activeTab.toLowerCase()==='notebook')?annotToMD(annotations[site]):"")}
         </ReactMarkdown></>)}

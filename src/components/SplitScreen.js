@@ -6,6 +6,7 @@ const SplitScreen = ({ left, right, split = 30, three }) => {
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
   const leftDiv = useRef(null);
   const rightDiv = useRef(null);
+  const sidebarWidthRef = useRef(split);
 
   useEffect(() => {
     const handleResize = () => {
@@ -18,23 +19,36 @@ const SplitScreen = ({ left, right, split = 30, three }) => {
     };
   }, []);
 
-  // for resizing
+  const applyPaneSizes = (widthPct, landscape) => {
+    if (landscape) {
+      if (leftDiv.current) leftDiv.current.style.width = `${widthPct}vw`;
+      if (rightDiv.current) rightDiv.current.style.width = `${100 - widthPct}vw`;
+    } else {
+      if (leftDiv.current) leftDiv.current.style.height = `${widthPct}vh`;
+      if (rightDiv.current) rightDiv.current.style.height = `${100 - widthPct}vh`;
+    }
+  };
+
+  // for resizing — update the DOM during drag; commit React state on mouseup
   const handleMouseDown = (e) => {
     e.preventDefault();
     const startX = e.touches ? e.touches[0].clientX : e.clientX;
-    const startY = e.touches ? e.touches[0].clientY : e.clientY;  
+    const startY = e.touches ? e.touches[0].clientY : e.clientY;
+    const startWidth = sidebarWidthRef.current;
+    const landscape = isLandscape;
 
     const handleMouseMove = (e) => {
       let newSidebarWidth;
-      if (isLandscape) {
+      if (landscape) {
         const deltaX = (e.touches ? e.touches[0].clientX : e.clientX) - startX;
-        newSidebarWidth = ((sidebarWidth * window.innerWidth) / 100 + deltaX) / window.innerWidth * 100;
+        newSidebarWidth = ((startWidth * window.innerWidth) / 100 + deltaX) / window.innerWidth * 100;
       } else {
         const deltaY = startY - (e.touches ? e.touches[0].clientY : e.clientY);
-        newSidebarWidth = ((sidebarWidth * window.innerHeight) / 100 + deltaY) / window.innerHeight * 100;
+        newSidebarWidth = ((startWidth * window.innerHeight) / 100 + deltaY) / window.innerHeight * 100;
       }
       if (newSidebarWidth >= 20 && newSidebarWidth <= 80) { // Restrict resizing between 20% and 80%
-        setSidebarWidth(newSidebarWidth);
+        sidebarWidthRef.current = newSidebarWidth;
+        applyPaneSizes(newSidebarWidth, landscape);
       }
     };
 
@@ -44,6 +58,8 @@ const SplitScreen = ({ left, right, split = 30, three }) => {
       document.removeEventListener('touchmove', handleMouseMove);
       document.removeEventListener('touchend', handleMouseUp);
 
+      setSidebarWidth(sidebarWidthRef.current);
+
       // resize three.js renderer
       if (three.current && three.current.renderer) {
         const mount = rightDiv.current;
@@ -51,7 +67,7 @@ const SplitScreen = ({ left, right, split = 30, three }) => {
         three.current.labelRenderer.setSize(mount.clientWidth, mount.clientHeight);
         three.current.camera.aspect = mount.clientWidth / mount.clientHeight;
         three.current.camera.updateProjectionMatrix();
-        three.current.controls.update();
+        if (three.current.invalidate) three.current.invalidate();
       }
     };
 

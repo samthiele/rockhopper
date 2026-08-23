@@ -95,6 +95,7 @@ const Hopper = ({tour}) => {
                         three.current.controls.target.copy(center);
                         three.current.controls.update();
                     }
+                    if (three.current.invalidate) three.current.invalidate();
                 }
             }
         }
