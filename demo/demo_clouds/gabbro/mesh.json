@@ -1,0 +1,24 @@
+{
+  "geometry": "mesh.ply",
+  "texture": "texture.jpg",
+  "preview": "texture_low.jpg",
+  "origin": [
+    0,
+    -2,
+    -4
+  ],
+  "styles": [
+    "texture",
+    "gabbro_normals"
+  ],
+  "textures": {
+    "texture": {
+      "preview": "texture_low.jpg",
+      "texture": "texture.jpg"
+    },
+    "gabbro_normals": {
+      "preview": "gabbro_normals_low.jpg",
+      "texture": "gabbro_normals.jpg"
+    }
+  }
+}

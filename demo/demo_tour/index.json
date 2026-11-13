@@ -64,6 +64,20 @@
         "view": {
             "pos": [1.3791489981651144,-4.897177357119292,-0.3901283082600894],
             "tgt": [-0.07684811458808041,-0.4996073659605804,-0.3485529156767414]  }  },
+    "island": {
+        "labels": {
+            "label1": {
+                "html": "<a href='./#start'>Back to the South Pole</a>",
+                "pos": [-1000,-1800,250]  }  },
+        "mediaType": "mesh",
+        "mediaURL": "island/mesh.json",
+        "name": "Island",
+        "tabs": {
+            "Maps": ["./md/maps/maps_en.md","./md/maps/maps_es.md","./md/maps/maps_de.md"]  },
+        "view": {
+            "style": "esri",
+            "pos": [-1061.928,-9008.851,7374.703],
+            "tgt": [-1061.928,599.503,168.438]  }  },
     "hosting": {
         "labels": {
             "label1": {
@@ -97,6 +111,21 @@
         "view": {
             "pos": [-1.4606746240318298,0.2350027341783439,-9.889954669139694],
             "tgt": [0,0,0]  }  },
+    "meshes": {
+        "labels": {
+            "label1": {
+                "html": "<a href='./#overlay'>Next stop: mixing clouds and meshes</a>",
+                "pos": [-0.43291145877802056,-1.1672034999695464,-0.41904869964936764]  }  },
+        "media": [
+            {"mediaType": "mesh", "mediaURL": "gabbro/mesh.json", "name": "Gabbro"},
+            {"mediaType": "photosphere", "mediaURL": "./img/site1/ps.jpg", "name": "Photo",
+             "view": {"pos": [-1.4606746240318298, 0.2350027341783439, -9.889954669139694], "tgt": [0, 0, 0]}}
+        ],
+        "tabs": {
+            "Meshes": ["./md/meshes/meshes_en.md","./md/meshes/meshes_es.md","./md/meshes/meshes_de.md"]  },
+        "view": {
+            "pos": [-0.354,-2.549,1.016],
+            "tgt": [-0.354,-0.747,-0.336]  }  },
     "multimedia": {
         "labels": {
             "label1": {
@@ -115,6 +144,23 @@
         "view": {
             "pos": [4.5904125669214455,-1.285764070505752,8.790615633756673],
             "tgt": [0,0,0]  }  },
+    "overlay": {
+        "media": [
+            {"mediaType": "cloud","mediaURL": "Penguin.zarr","name": "Penguin","pointSize": 0.01},
+            {"mediaType": "mesh","mediaURL": "gabbro/mesh.json","name": "Gabbro"},
+            {"mediaType": "photosphere","mediaURL": "./img/site1/ps.jpg","name": "Photo",
+             "view": {"pos": [-1.4606746240318298, 0.2350027341783439, -9.889954669139694], "tgt": [0, 0, 0]}}
+        ],
+        "pointSize": 0.01,
+        "tabs": {
+            "Overlay": ["./md/overlay/overlay_en.md","./md/overlay/overlay_es.md","./md/overlay/overlay_de.md"]  },
+        "view": {
+            "pos": [-0.215,-7.623,0.058],
+            "tgt": [-0.215,-1.623,-0.842]  },
+        "labels": {
+            "label1": {
+                "html": "<a href='./#start'>Back to the South Pole</a>",
+                "pos": [-0.42367895855679544,-3.1522588355790186,-1.4554901928616697]  }  }  },
     "site1": {
         "labels": {
             "label1": {
@@ -131,7 +177,16 @@
                 "pos": [95.30044012548358,0.0677445020932413,-27.266514672535752]  },
             "label5": {
                 "html": "<a href='./#clouds'>4. Point clouds</a>",
-                "pos": [27.39108414765349,-1.30799888668479,-95.21749680141637]  }  },
+                "pos": [27.39108414765349,-1.30799888668479,-95.21749680141637]  },
+            "label6": {
+                "html": "<a href='./#meshes'>6. Meshes</a>",
+                "pos": [45,-1.3,-89]  },
+            "label7": {
+                "html": "<a href='./#overlay'>7. Mesh and cloud</a>",
+                "pos": [60,-1.2,-80]  },
+            "label8": {
+                "html": "<a href='./#island'>8. Maps</a>",
+                "pos": [75,-1.4,-65]  }  },
         "mediaType": "photosphere",
         "mediaURL": "./img/site1/ps.jpg",
         "view": {
@@ -148,8 +203,11 @@
     "annotations": "annotations",
     "clouds": "clouds",
     "hosting": "hosting",
+    "island": "island",
     "markdown": "markdown",
+    "meshes": "meshes",
     "multimedia": "multimedia",
+    "overlay": "overlay",
     "site1": "site1",
     "site2": "site2",
     "start": "site1"  },

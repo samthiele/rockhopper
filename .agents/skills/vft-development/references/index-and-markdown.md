@@ -93,8 +93,9 @@ Each key is a **lowercase site id** (also used in URLs: `#/taburiente`). Value f
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `mediaType` | `"cloud"` \| `"photosphere"` | Which viewer to use |
-| `mediaURL` | string | Cloud: zarr name or URL. Photosphere: path under the tour (e.g. `./img/hoyonegro/ps.jpg`) |
+| `mediaType` | `"cloud"` \| `"mesh"` \| `"photosphere"` | Which viewer to use |
+| `mediaURL` | string | Cloud: zarr name or URL. Mesh: `name/mesh.json`. Photosphere: path under the tour (e.g. `./img/hoyonegro/ps.jpg`) |
+| `media` | array | Optional list of `{ mediaType, mediaURL, name, view? }`. Several clouds or meshes share one scene and each gets a top-right eye. A photosphere in the list is a separate view mode, not an eye |
 | `pointSize` | number | Cloud rendering size (often ≈ export `resolution`; La Palma island overview uses `30`, cliffs `0.1`) |
 | `view` | object | Initial camera: `pos` `[x,y,z]`, `tgt` `[x,y,z]`; optional `style` to pick a cloud stylesheet key |
 | `tabs` | object | **Site-local** tabs (same shape as global `tabs`) |
@@ -127,7 +128,28 @@ Each key is a **lowercase site id** (also used in URLs: `#/taburiente`). Value f
 }
 ```
 
-Relative cloud URLs resolve to `{cloudURL}/{mediaURL}` when deployed (La Palma: `https://storage.googleapis.com/rockhopper/LaPalma.zarr`), or `{devURL}/{mediaURL}` under the local Flask server.
+Relative cloud and mesh URLs resolve to `{cloudURL}/{mediaURL}` when deployed (La Palma: `https://storage.googleapis.com/rockhopper/LaPalma.zarr`), or `{devURL}/{mediaURL}` under the local Flask server. Photosphere paths stay relative to the tour.
+
+### Mesh site
+
+`mediaURL` points at `mesh.json` inside a folder written by `VFT.addMesh` (`mesh.ply`, `texture_low.jpg`, `texture.jpg`). The demo gabbro stop also carries the tutorial panorama:
+
+```json
+"meshes": {
+  "media": [
+    {"mediaType": "mesh", "mediaURL": "gabbro/mesh.json", "name": "Gabbro"},
+    {"mediaType": "photosphere", "mediaURL": "./img/site1/ps.jpg", "name": "Photo",
+     "view": {"pos": [-1.461, 0.235, -9.890], "tgt": [0, 0, 0]}}
+  ],
+  "view": {"pos": [-0.354, -2.549, 1.016], "tgt": [-0.354, -0.747, -0.336]}
+}
+```
+
+Several clouds or meshes on one stop use `media` instead of a single pair. The viewer shows an eye toggle per 3D object. Example: `demo/demo_tour` site `overlay` lists `Penguin.zarr`, `gabbro/mesh.json`, and the same panorama.
+
+A photosphere in that list, beside a cloud or mesh, is a second view mode, not another object in the scene. The site `view` is the model camera. The photosphere entry has its own `view`. `view.mode` of `"photosphere"` opens in the panorama. **Photosphere** in the lower-right opens it, and the button then reads **3D View**. The eye list stays in the top-right and only while the 3D view is open. Each model's colour buttons sit in one top-left row, one group beside the next, and they hide while the panorama is open. Panorama labels are `photoLabels` on the site. Panorama lines, planes, and traces are `annotations[site].photosphere`. The demo `meshes` and `overlay` stops both use `./img/site1/ps.jpg`.
+
+`VFT.addMap` writes the same manifest. Extra colour layers add `styles` plus a `textures` object (`{name: {preview, texture}}`). The first name in `styles` is the default layer; `defaultColor` chooses it, and `view.style` can override it on entry. The demo `island` stop opens on `esri`, then `island` and `elevation`.
 
 ### Photosphere site (La Palma — Hoyo Negro)
 
@@ -188,8 +210,8 @@ Maps **URL token → site id**. At minimum include entry for the landing route:
 
 ## `annotURL` and annotations vs labels
 
-- `annotURL` (usually `./annotations.json`): drawn geometry (lines, planes, traces) edited in the 3D view; synced in Notebook when present.
-- `sites[site].labels`: curated HTML markers stored **in `index.json`**, ideal for permanent navigation and place names (as in La Palma).
+- `annotURL` (usually `./annotations.json`): drawn geometry (lines, planes, traces) edited in the 3D view; synced in Notebook when present. On a mixed stop the panorama stores that same shape under `annotations[site].photosphere`, because the two cameras do not share coordinates. The Notebook only reads the model geometry.
+- `sites[site].labels`: curated HTML markers stored **in `index.json`**, ideal for permanent navigation and place names (as in La Palma). A mixed stop keeps panorama markers in `sites[site].photoLabels`.
 
 Do not confuse the two; both can coexist on a site.
 

@@ -26,4 +26,16 @@
 "hosting": {
     "lines": [],
     "planes": [],
+    "traces": []  },
+"meshes": {
+    "lines": [],
+    "planes": [],
+    "traces": []  },
+"overlay": {
+    "lines": [],
+    "planes": [],
+    "traces": []  },
+"island": {
+    "lines": [],
+    "planes": [],
     "traces": []  }  }

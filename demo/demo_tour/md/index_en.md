@@ -14,7 +14,10 @@ Have an explore to learn about the different VFT tools you can use.
 - [Site 2: Annotations](./#annotations)
 - [Site 3: Multimedia](./#multimedia)
 - [Site 4: Point clouds](./#clouds)
-- [Site 5: Hosting](./#hosting)
+- [Site 5: Meshes](./#meshes)
+- [Site 6: Mesh and cloud](./#overlay)
+- [Site 7: Hosting](./#hosting)
+- [Site 8: Maps](./#island)
 
 ![Don't forget to be engaging and interactive, or the audience will fall asleep.](https://upload.wikimedia.org/wikipedia/commons/7/7b/ZSL_London_-_Northern_rockhopper_penguin_%2801%29.jpg)
 

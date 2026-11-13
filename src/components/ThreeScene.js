@@ -6,6 +6,7 @@ import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { disposeObject3D, disposeSceneContents } from './dispose3d';
+import { resetFrame } from './sceneFrame';
 import './ThreeScene.css';
 
 const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
@@ -27,8 +28,76 @@ const download = (text, filename, type) => {
     // Revoke the object URL to free up memory
     URL.revokeObjectURL(url);
 }
+function EyeIcon({ off }) {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" strokeWidth="2"/>
+            <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2"/>
+            {off && <path d="M4 20L20 4" stroke="currentColor" strokeWidth="2"/>}
+        </svg>
+    );
+}
+
+function annotBucket(annotations, site, three, create) {
+    const root = annotations && annotations[site];
+    if (!root) return { lines: [], planes: [], traces: [] };
+    if (three.current.mixed && three.current.viewMode === 'photosphere') {
+        if (!root.photosphere) {
+            if (!create) return { lines: [], planes: [], traces: [] };
+            root.photosphere = { lines: [], planes: [], traces: [] };
+        }
+        return root.photosphere;
+    }
+    if (create) {
+        if (!root.lines) root.lines = [];
+        if (!root.planes) root.planes = [];
+        if (!root.traces) root.traces = [];
+    }
+    return root;
+}
+
 const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
-                        fixCamera, init, setInit, currentMedia }) => {
+                        fixCamera, mixed, init, setInit, children }) => {
+    const [layers, setLayers] = useState([]);
+    const [viewMode, setViewMode] = useState(() => three.current.viewMode || (fixCamera ? 'photosphere' : 'model'));
+
+    // Assigned during render so child effects can register before this component's effects run.
+    if (!three.current.frame) resetFrame(three);
+    three.current.onViewMode = (mode) => setViewMode(mode);
+    const layerAllowed = (entry) => {
+        if (!three.current.mixed) return true;
+        const photo = three.current.viewMode === 'photosphere';
+        return photo ? entry.kind === 'photosphere' : entry.kind !== 'photosphere';
+    };
+    const publishLayers = (next) => {
+        three.current.layerList = next;
+        setLayers(next);
+    };
+    three.current.registerLayer = (entry) => {
+        entry.kind = entry.kind || 'model';
+        if (entry.eye === undefined) entry.eye = entry.visible !== false;
+        entry.visible = entry.eye && layerAllowed(entry);
+        entry.objects.current.forEach((object) => {
+            object.visible = entry.visible && !object.userData.superseded;
+        });
+        publishLayers([...(three.current.layerList || []).filter((item) => item.id !== entry.id), entry]);
+    };
+    three.current.unregisterLayer = (id) => {
+        publishLayers((three.current.layerList || []).filter((item) => item.id !== id));
+    };
+    three.current.setLayerVisible = (id, visible) => {
+        const next = (three.current.layerList || []).map((item) => {
+            if (item.id !== id) return item;
+            item.eye = visible;
+            item.visible = visible && layerAllowed(item);
+            item.objects.current.forEach((object) => {
+                object.visible = item.visible && !object.userData.superseded;
+            });
+            return { ...item };
+        });
+        publishLayers(next);
+        if (three.current.invalidate) three.current.invalidate();
+    };
     const mountRef = useRef(null);
                             
     // annotation states
@@ -36,6 +105,9 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
     const [annotVis, setAnnotVis] = useState(true); // view or hide annotations
     const [labelVis, setLabelVis] = useState(true); // view or hide annotations
     const [selection, setSelection] = useState([]);
+    three.current.clearSelection = () => setSelection([]);
+    const labelFieldRef = useRef('labels');
+    labelFieldRef.current = (mixed && viewMode === 'photosphere') ? 'photoLabels' : 'labels';
     
     const spheresRef = useRef([]); // Stores annotation spheres
     const lineRef = useRef([]); // Stores annotation lines
@@ -76,8 +148,9 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         three.current.controls.enableDamping = true;
         three.current.controls.dampingFactor = 0.25;
         
-        // handle fixed camera (and zoom approach for fixed cameras)
+        // Wheel changes field of view inside a photosphere. Orbit dolly is used on a model.
         function onMouseWheel(event) {
+            if (three.current.viewMode !== 'photosphere') return;
             if (event.wheelDeltaY) { // WebKit
                 three.current.camera.fov -= event.wheelDeltaY * 0.05;
             } else if (event.wheelDelta) { // Opera / IE9
@@ -90,13 +163,92 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             if (three.current.invalidate) three.current.invalidate();
         }
         if (fixCamera){
+            three.current.viewMode = 'photosphere';
             three.current.controls.screenSpacePanning = false;
             three.current.controls.enableZoom = false;
             three.current.controls.enablePan = false;
-            three.current.camera.position.set(10,0,0); // for some reason orbit controls don't work if camera is at origin...
-            mount.addEventListener('mousewheel', onMouseWheel, false);
-            mount.addEventListener('DOMMouseScroll', onMouseWheel, false);
+            three.current.camera.position.set(10,0,0); // orbit controls fail if the camera is at the origin
         }
+        mount.addEventListener('mousewheel', onMouseWheel, false);
+        mount.addEventListener('DOMMouseScroll', onMouseWheel, false);
+
+        const captureCamera = () => ({
+            pos: three.current.camera.position.toArray(),
+            tgt: three.current.controls.target.toArray(),
+            fov: three.current.camera.fov,
+        });
+        const seedCamera = (mode) => {
+            const photo = mode === 'photosphere';
+            const stored = photo ? three.current.photoView : three.current.modelView;
+            const pos = stored && stored.pos ? stored.pos : (photo ? [10, 0, 0] : [0, -10, 4]);
+            const tgt = stored && stored.tgt ? stored.tgt : [0, 0, 0];
+            return { pos, tgt, fov: photo ? 75 : 40 };
+        };
+        three.current.applyViewMode = (mode, initial) => {
+            if (initial) three.current.savedView = {};
+            else if (three.current.camera && three.current.viewMode) {
+                three.current.savedView = three.current.savedView || {};
+                three.current.savedView[three.current.viewMode] = captureCamera();
+            }
+            three.current.viewMode = mode;
+            if (three.current.onViewMode) three.current.onViewMode(mode);
+            if (!initial && three.current.clearSelection) three.current.clearSelection();
+            const photo = mode === 'photosphere';
+            (three.current.layerList || []).forEach((entry) => {
+                const allow = !three.current.mixed || (photo ? entry.kind === 'photosphere' : entry.kind !== 'photosphere');
+                entry.visible = entry.eye !== false && allow;
+                entry.objects.current.forEach((object) => {
+                    object.visible = entry.visible && !object.userData.superseded;
+                });
+            });
+            if (three.current.layerList) setLayers(three.current.layerList.map((item) => ({ ...item })));
+            if (photo) {
+                if (three.current._modelPointSize == null) three.current._modelPointSize = three.current.pointSize;
+                three.current.pointSize = 0.25;
+            } else if (three.current._modelPointSize != null) {
+                three.current.pointSize = three.current._modelPointSize;
+                three.current._modelPointSize = null;
+            }
+            if (!three.current.camera || !three.current.controls) {
+                if (three.current.invalidate) three.current.invalidate();
+                return;
+            }
+            const saved = (three.current.savedView && three.current.savedView[mode]) || seedCamera(mode);
+            three.current.savedView = three.current.savedView || {};
+            three.current.savedView[mode] = saved;
+            const camera = three.current.camera;
+            const controls = three.current.controls;
+            camera.up.set(0, photo ? 1 : 0, photo ? 0 : 1);
+            // OrbitControls freezes camera.up into a quaternion at creation.
+            // A mixed site starts Z-up, so the panorama has to refresh that
+            // quaternion or dragging orbits around the wrong axis.
+            controls._quat.setFromUnitVectors(camera.up, new THREE.Vector3(0, 1, 0));
+            controls._quatInverse.copy(controls._quat).invert();
+            controls._sphericalDelta.set(0, 0, 0);
+            controls._panOffset.set(0, 0, 0);
+            controls._scale = 1;
+            camera.fov = saved.fov;
+            camera.position.set(saved.pos[0], saved.pos[1], saved.pos[2]);
+            const target = new THREE.Vector3(saved.tgt[0], saved.tgt[1], saved.tgt[2]);
+            camera.lookAt(target);
+            controls.target.copy(target);
+            controls.enableZoom = !photo;
+            controls.enablePan = !photo;
+            controls.screenSpacePanning = !photo;
+            // A point cloud sets far from its own size. The panorama is a
+            // sphere of radius 100, so that near far-plane clips it to black.
+            if (photo) {
+                if (three.current._modelFar == null) three.current._modelFar = camera.far;
+                camera.near = 0.1;
+                camera.far = Math.max(camera.far, 10000);
+            } else if (three.current._modelFar != null) {
+                camera.far = three.current._modelFar;
+                three.current._modelFar = null;
+            }
+            camera.updateProjectionMatrix();
+            controls.update();
+            if (three.current.invalidate) three.current.invalidate();
+        };
 
         // Handle Resize
         const handleResize = () => {
@@ -129,6 +281,9 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         three.current.controls.addEventListener('change', invalidate);
                 
         // setup complete!
+        if (three.current.mixed || fixCamera) {
+            three.current.applyViewMode(three.current.viewMode || (fixCamera ? 'photosphere' : 'model'), true);
+        }
         console.log("Three.js setup complete.");
         setInit(true);
         invalidate();
@@ -153,22 +308,18 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
           };
     }, [fixCamera]);
 
-    // handle changes in site (clear scene contents)
+    // Drop annotation handles when the site changes. SceneReset clears the
+    // actual objects before the next content effect adds a cloud or mesh.
     useEffect(()=>{
-        if (currentMedia && three.current.scene){
-            disposeSceneContents(three.current.scene);
-            if (three.current.invalidate) three.current.invalidate();
-        }
         spheresRef.current = [];
         lineRef.current = [];
         planeRef.current = [];
         labelRef.current = [];
         setSelection([]);
-        // clear any (accidentally) remaining labels
         document.querySelectorAll('.outerdiv').forEach( (l)=>{
             l.innerHTML = '';
         });
-    }, [currentMedia]);
+    }, [site]);
     
     // SETUP PICKING
     useEffect(() => {
@@ -182,7 +333,14 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(mouse, three.current.camera);
             raycaster.params.Points.threshold = three.current.pointSize; // point size for picking
-            return raycaster.intersectObjects(three.current.scene.children, true)
+            return raycaster.intersectObjects(three.current.scene.children, true).filter((hit) => {
+                let object = hit.object;
+                while (object) {
+                    if (object.visible === false) return false;
+                    object = object.parent;
+                }
+                return true;
+            });
         }
 
         const handleSingleClick = (event) => {
@@ -210,7 +368,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
 
             // set center of rotation
             if (selectedObject.userData.blockDelete){
-                if (!fixCamera){ // not allowed with fixed cameras
+                if (three.current.viewMode !== 'photosphere'){ // a panorama stays inside the sphere
                     three.current.camera.lookAt(selectedPoint);
                     three.current.controls.target.copy(selectedPoint);
                     
@@ -221,8 +379,10 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
 
                 // remove clicked element from annotations array (based on position)
                 if (selectedObject.userData.annot){
+                const bucket = annotBucket(annotations, site, three);
                 ['lines','planes','traces'].forEach( (n) => {
-                    annotations[site][n]=annotations[site][n].filter( (l) => {
+                    if (!bucket[n]) return;
+                    bucket[n]=bucket[n].filter( (l) => {
                     const v = l.verts[0];
                     const v2 = selectedObject.userData.annot.verts[0];
                     return !((v.x == v2.x) && (v.y == v2.y) && (v.z == v2.z));
@@ -242,6 +402,8 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             if (!(site in newAnnot)){
                 newAnnot[site] = {lines:[], planes:[], traces:[]};
             }
+            const bucket = annotBucket(newAnnot, site, three, true);
+            const labelField = (three.current.mixed && three.current.viewMode === 'photosphere') ? 'photoLabels' : 'labels';
             // add geometry to annotations
             if (selection.length === 1) {
                 let txt = prompt("Enter label (text or html)").trim();
@@ -250,16 +412,16 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                                            selection[0].y,selection[0].z]}
                     
                     let k = 'label1';
-                    if (tour.sites[site].labels) {
+                    if (tour.sites[site][labelField]) {
                         let n = 1;
-                        while (k in tour.sites[site].labels){
+                        while (k in tour.sites[site][labelField]){
                             n += 1;
                             k = `label${n}`
                         }
                         console.log(k);
                     }
-                    if (!tour.sites[site].labels) tour.sites[site].labels = {};
-                    tour.sites[site].labels[k] = label;
+                    if (!tour.sites[site][labelField]) tour.sites[site][labelField] = {};
+                    tour.sites[site][labelField][k] = label;
                     drawLabel(txt, new THREE.Vector3(...selection[0]), k);
                     if (three.current.invalidate) three.current.invalidate();
 
@@ -287,7 +449,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 plunge = -plunge;
                 trend = trend - 180; }
                 const distance = v1.distanceTo(v2);
-                newAnnot[site].lines.push({
+                bucket.lines.push({
                     verts: [v1, v2],
                     color: annotColor,
                     trend: trend < 0 ? trend + 360 : trend,
@@ -305,7 +467,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 let strike = (Math.atan2(normal.x, normal.y) * 180) / Math.PI;
                 if (strike < 0) strike += 360;
                 const dipdir = (strike + 90) % 360;
-                newAnnot[site].planes.push({
+                bucket.planes.push({
                     verts: [v1, v2, v3],
                     color: annotColor,
                     strike,
@@ -317,7 +479,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
                 for (let i = 0; i < selection.length - 1; i++) {
                 totalLength += selection[i].distanceTo(selection[i + 1]);
                 }
-                newAnnot[site].traces.push({
+                bucket.traces.push({
                 verts: [...selection],
                 color: annotColor,
                 length: totalLength,
@@ -354,14 +516,15 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
         if (!labelVis) return; 
 
         // add labels
-        if (tour.sites[site].labels) {
-            Object.keys(tour.sites[site].labels).forEach( (k) => {
-                const lab = tour.sites[site].labels[k];
+        const labels = tour.sites[site] && tour.sites[site][labelFieldRef.current];
+        if (labels) {
+            Object.keys(labels).forEach( (k) => {
+                const lab = labels[k];
                 drawLabel(lab.html, new THREE.Vector3(...lab.pos), k);
             } );
         }
         if (three.current.invalidate) three.current.invalidate();
-    },[site, init, labelVis]);
+    },[site, init, labelVis, viewMode]);
     
       // ** Draw annotations **
       useEffect(()=>{
@@ -396,13 +559,14 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             }
 
             if (annotations && (site in annotations)) {
-                annotations[site].lines.forEach( (l) => { drawLine(l) } );
-                annotations[site].planes.forEach( (l) => { drawPlane(l) } );
-                annotations[site].traces.forEach( (l) => { drawLine(l) } );
+                const bucket = annotBucket(annotations, site, three);
+                (bucket.lines || []).forEach( (l) => { drawLine(l) } );
+                (bucket.planes || []).forEach( (l) => { drawPlane(l) } );
+                (bucket.traces || []).forEach( (l) => { drawLine(l) } );
             }
         }
         if (three.current.invalidate) three.current.invalidate();
-      }, [site, init, selection, annotations, annotColor, annotVis]);
+      }, [site, init, selection, annotations, annotColor, annotVis, viewMode]);
     
     // **Add labels **
     const drawLabel = (html, position, key) => {
@@ -428,7 +592,7 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
             if (three.current.invalidate) three.current.invalidate();
 
             // remove label from the tour
-            delete tour.sites[site].labels[key];
+            delete tour.sites[site][labelFieldRef.current][key];
 
             // save index.json if in dev mode
             if (tour.devURL){
@@ -487,6 +651,43 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
 
     // return
     return (<div style={{ height: "100%", width: "100%", position: "relative"}}>
+            {mixed && viewMode === 'model' && layers.filter((item) => item.kind !== 'photosphere').length > 1 &&
+                <div className="layertoggle">
+                    {layers.filter((item) => item.kind !== 'photosphere').map((item) => (
+                    <div className="layerrow" key={item.id}>
+                        <span>{item.name}</span>
+                        <button
+                            className="eye"
+                            type="button"
+                            aria-label={item.eye === false ? `Show ${item.name}` : `Hide ${item.name}`}
+                            onClick={() => three.current.setLayerVisible(item.id, item.eye === false)}>
+                            <EyeIcon off={item.eye === false}/>
+                        </button>
+                    </div>
+                ))}
+            </div>}
+            {mixed && <div className="modebutton">
+                <button
+                    className="button"
+                    type="button"
+                    onClick={() => three.current.applyViewMode && three.current.applyViewMode(viewMode === 'photosphere' ? 'model' : 'photosphere')}>
+                    {viewMode === 'photosphere' ? '3D View' : 'Photosphere'}
+                </button>
+            </div>}
+            {!mixed && layers.length > 1 && <div className="layertoggle">
+                {layers.map((item) => (
+                    <div className="layerrow" key={item.id}>
+                        <span>{item.name}</span>
+                        <button
+                            className="eye"
+                            type="button"
+                            aria-label={item.visible ? `Hide ${item.name}` : `Show ${item.name}`}
+                            onClick={() => three.current.setLayerVisible(item.id, !item.visible)}>
+                            <EyeIcon off={!item.visible}/>
+                        </button>
+                    </div>
+                ))}
+            </div>}
             <div className="bottombuttons">
                 <div className="row">
                     <button className="button" onClick={() => {
@@ -530,6 +731,9 @@ const ThreeScene = ({ tour, site, three, annotations, setAnnotations,
 
             </div>
             <div className="viewer" ref={mountRef} style={{ height: "100%", width: "100%"}} />
+            <div className={`stylebar${mixed && viewMode === 'photosphere' ? ' photo-mode' : ''}`}>
+                {children}
+            </div>
             </div>);
 };
 export default ThreeScene;

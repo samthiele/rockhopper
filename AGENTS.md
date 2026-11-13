@@ -1,12 +1,12 @@
 # RockHopper — Agent Guide
 
-RockHopper builds **web-based virtual field trips (VFTs)**: streamable 3D point clouds (or photospheres) plus explanatory markdown. Work falls into two tracks. Decide which applies **before** digging into code.
+RockHopper builds **web-based virtual field trips (VFTs)**: streamable 3D point clouds, textured meshes, or photospheres, plus explanatory markdown. Work falls into two tracks. Decide which applies **before** digging into code.
 
 ## Track triage (do this first)
 
 | Track | Typical work | What matters |
 |-------|--------------|--------------|
-| **VFT development** | Tour content, sites, languages, annotations, hosting a tour | **`index.json`** (glues the tour), markdown, `annotations.json`, Python `rockhopper.VFT` API, zarr export |
+| **VFT development** | Tour content, sites, languages, annotations, hosting a tour | **`index.json`** (glues the tour), markdown, `annotations.json`, Python `rockhopper.VFT` API, zarr and mesh export |
 | **RockHopper development** | Viewer, streaming, editing UX, packaging | React app in `src/`, Three.js / zarr streaming, Flask dev server, shipping built UI into `rockhopper/ui/` |
 
 **Default bias:** most requests are **VFT development** (content + Python tooling). Only treat a task as RockHopper (platform) development when it clearly changes the viewer (React front-end), build pipeline, or Python package internals.
@@ -20,12 +20,15 @@ RockHopper builds **web-based virtual field trips (VFTs)**: streamable 3D point 
 ## Repo map (short)
 
 ```
-rockhopper/          Python package (VFT, clouds, Flask server)
-  clouds.py          PLY I/O, exportZA → streamable .zarr
+rockhopper/          Python package (VFT, clouds, meshes, Flask server)
+  clouds.py          PLY point clouds, exportZA → streamable .zarr
+  meshes.py          OBJ → textured PLY + preview/full JPEG (exportMesh)
+  maps.py            GeoTIFF or lon/lat box → terrain mesh (exportMap)
   server.py          VFT class + local /update dev server
   ui/                Built React assets copied into each tour
 src/                 React source (edit here for platform work)
-demo/demo_tour/     Small example VFT (index.json, md/, img/, …)
+demo/demo_tour/      Small example VFT (index.json, md/, img/, …)
+demo/demo_clouds/    Penguin.zarr, gabbro/ mesh, and island/ map used by the demo tour
 examples/            tutorial.ipynb — primary authoring workflow
 ```
 

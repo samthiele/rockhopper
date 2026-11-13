@@ -1,0 +1,29 @@
+{
+  "geometry": "mesh.ply",
+  "preview": "esri_low.jpg",
+  "texture": "esri.jpg",
+  "origin": [
+    17690656,
+    -7266100,
+    160
+  ],
+  "styles": [
+    "esri",
+    "island",
+    "elevation"
+  ],
+  "textures": {
+    "esri": {
+      "preview": "esri_low.jpg",
+      "texture": "esri.jpg"
+    },
+    "island": {
+      "preview": "island_low.jpg",
+      "texture": "island.jpg"
+    },
+    "elevation": {
+      "preview": "elevation_low.jpg",
+      "texture": "elevation.jpg"
+    }
+  }
+}

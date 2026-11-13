@@ -7,6 +7,8 @@ import logging
 from pathlib import Path
 import numpy as np
 from rockhopper.clouds import loadPLY, exportZA
+from rockhopper.maps import exportMap
+from rockhopper.meshes import exportMesh
 import rockhopper.ui
 import shutil
 import numpy as np
@@ -146,21 +148,23 @@ class VFT(object):
         """
             
         # basic VFT properties
-        self.vft_path = vft_path
-        self.cloud_path = cloud_path
-        os.makedirs(vft_path, exist_ok=True)
-        if cloud_path: 
-            os.makedirs(cloud_path, exist_ok=True)
+        # Absolute paths: Flask resolves a relative static_folder against the
+        # package directory, not the working directory.
+        self.vft_path = os.path.abspath(vft_path)
+        self.cloud_path = os.path.abspath(cloud_path) if cloud_path else cloud_path
+        os.makedirs(self.vft_path, exist_ok=True)
+        if self.cloud_path: 
+            os.makedirs(self.cloud_path, exist_ok=True)
         self.updateIndex()
         self.port = None
         self.host = None
         self.devMode = devMode
 
         # copy required files from rockhopper.ui
-        rockhopper.ui.copyTo(vft_path, overwrite=overwrite)
+        rockhopper.ui.copyTo(self.vft_path, overwrite=overwrite)
 
         # setup app
-        self.app = Flask(__name__, static_folder=vft_path)
+        self.app = Flask(__name__, static_folder=self.vft_path)
         CORS(self.app)
         self.server_thread = None
 
@@ -519,8 +523,8 @@ class VFT(object):
 
         # add site for this cloud
         if site is not None:
-            self.addSite( site, mediaURL=f"{name}.zarr", mediaType='cloud', 
-                        pointSize = kwds.get('resolution',0.1), **site_kwds )
+            self._set_media(site, "cloud", f"{name}.zarr",
+                            pointSize=kwds.get('resolution', 0.1), site_kwds=site_kwds)
 
     def addPhotosphere( self, site, image, **kwds):
         """
@@ -535,7 +539,9 @@ class VFT(object):
 
         Keywords
         ---------
-        All keywords are passed directly to `self.addSite( ... )` when creating the new site.
+        All keywords are passed to the site. If the site already has a cloud or
+        mesh, the panorama is attached instead of replacing it, and ``view`` is
+        stored on the photosphere (the site ``view`` stays the model camera).
         """
 
         # copy the photosphere into the required directory
@@ -549,7 +555,193 @@ class VFT(object):
         
         # add site for this photosphere
         if site is not None:
-            self.addSite( site, mediaURL=f'./{dest}', mediaType='photosphere', **kwds )
+            self._set_media(site, "photosphere", f"./{dest}", site_kwds=kwds)
+
+    def addMesh( self, site, name, obj=None, up="z", materials=None, site_kwds=None):
+        """
+        Convert a textured OBJ to a PLY mesh plus preview and full JPEG, and
+        store it under ``cloud_path`` (the static file server).
+
+        Parameters
+        ----------
+        site : str
+            Site name to create. ``None`` converts the mesh without adding a site.
+        name : str
+            Folder name. Files are written to ``{cloud_path}/{name}/``.
+        obj : str | pathlib.Path
+            Path to the ``.obj``. If None, ``{name}/mesh.json`` is assumed to exist already.
+        up : str
+            ``"z"`` (default) keeps the OBJ axes. ``"y"`` remaps a Y-up OBJ into the
+            viewer's Z-up frame. Applied before the mesh is centered.
+        materials : str | list | None
+            Extra MTL files. Each ``map_Kd`` becomes another JPEG the viewer
+            can switch, using the same buttons as a point-cloud style.
+        site_kwds : dict
+            Extra fields passed to ``addSite`` (``view``, ``tabs``, ``pointSize``, …).
+
+        The PLY contains float32 positions and texture coordinates only (no normals,
+        no vertex colours). ``mesh.json`` records an integer ``origin``, the truncated
+        mean of the vertices, which has been subtracted from the geometry.
+        """
+        if obj is not None:
+            assert self.cloud_path is not None, "Create a VFT with a `cloud_path` to add local meshes."
+            out_dir = os.path.join(self.cloud_path, name)
+            exportMesh(obj, out_dir, up=up, materials=materials)
+
+        if site is not None:
+            self._set_media(site, "mesh", f"{name}/mesh.json", site_kwds=site_kwds)
+
+    def addMap(self, site, name, base, dem=None, textures=None, resolution=None, tolerance=None,
+               verticalExaggeration=2.5, defaultColor=None, zoom=0, site_kwds=None):
+        """
+        Build a georeferenced terrain mesh and store it under ``cloud_path``.
+
+        Parameters
+        ----------
+        site : str
+            Site name to create. ``None`` writes the mesh without adding a site.
+        name : str
+            Folder name. Files are written to ``{cloud_path}/{name}/``.
+        base : str | tuple
+            GeoTIFF whose bounds define the map, or
+            ``(min_lon, max_lon, min_lat, max_lat)``. A GeoTIFF is the first
+            texture. A bounding box becomes a coloured DEM in EPSG:3857.
+        dem : str | None
+            Elevation GeoTIFF. ``None`` fetches Mapzen terrarium tiles.
+        textures : str | list | None
+            Extra colour layers: GeoTIFF paths, ``"esri"``, ``"google"``, or
+            ``"elevation"``. ``None`` adds Esri imagery for a GeoTIFF and
+            nothing extra for a bounding box.
+        resolution : float | None
+            Uniform spacing in metres. The default merges nearly planar blocks.
+        tolerance : float | None
+            Vertical error of that merge, in metres (starts at 1).
+        verticalExaggeration : float
+            Scales elevation after simplification. Defaults to 2.5.
+        defaultColor : str | None
+            Layer shown first (``"esri"``, ``"google"``, ``"elevation"``, or a
+            GeoTIFF name). ``None`` uses the base image, or the elevation ramp
+            for a bounding box.
+        zoom : int
+            Tile-level offset for the DEM and for Esri or Google imagery.
+            ``0`` is the automatic zoom, ``+2`` is two levels finer.
+        site_kwds : dict
+            Extra fields passed to ``addSite``. ``view.style`` selects the
+            texture shown on entry.
+        """
+        assert self.cloud_path is not None, "Create a VFT with a `cloud_path` to add local maps."
+        exportMap(
+            base, os.path.join(self.cloud_path, name),
+            dem=dem, textures=textures, resolution=resolution, tolerance=tolerance,
+            verticalExaggeration=verticalExaggeration, defaultColor=defaultColor, zoom=zoom,
+        )
+        if site is not None:
+            self._set_media(site, "mesh", f"{name}/mesh.json", site_kwds=site_kwds)
+
+    def _existing_media(self, spec):
+        """Media entries already stored on a site, either as a list or a single pair."""
+        if not spec:
+            return []
+        if spec.get("media"):
+            return [dict(item) for item in spec["media"]]
+        if spec.get("mediaType") and spec.get("mediaURL"):
+            item = {"mediaType": spec["mediaType"], "mediaURL": spec["mediaURL"]}
+            if spec.get("name"):
+                item["name"] = spec["name"]
+            if spec.get("pointSize") is not None:
+                item["pointSize"] = spec["pointSize"]
+            return [item]
+        return []
+
+    def _commit_media(self, name, items, kwds):
+        """Replace the site's single media pair with a ``media`` list."""
+        name = name.lower()
+        self.updateIndex()
+        if name not in self.index["sites"] and len(self.index["sites"]) == 0:
+            self.index["synonyms"]["start"] = name
+        site = self.index["sites"].get(name, {})
+        site.pop("mediaType", None)
+        site.pop("mediaURL", None)
+        site.pop("name", None)
+        site["media"] = items
+        for key, value in (kwds or {}).items():
+            if key == "name":
+                continue
+            site[key] = value
+        self.index["sites"][name] = site
+        self.writeIndex()
+
+    def _set_media(self, name, mediaType, mediaURL, pointSize=None, site_kwds=None):
+        """
+        Add one cloud, mesh, or photosphere to a site.
+
+        A cloud or mesh added to a panorama site (or a panorama added to a
+        cloud or mesh) is attached. The site then lists both in ``media``.
+        The site ``view`` stays the model camera. The panorama's camera is
+        ``view`` on its own media entry. Adding the same kind to an empty
+        site, or to a site that has only that kind, still replaces it.
+        """
+        site_kwds = dict(site_kwds or {})
+        self.updateIndex()
+        key = name.lower()
+        spec = self.index["sites"].get(key, {})
+        items = self._existing_media(spec)
+        photos = [item for item in items if item.get("mediaType") == "photosphere"]
+        models = [item for item in items if item.get("mediaType") != "photosphere"]
+        incoming_photo = mediaType == "photosphere"
+        other_kind = (incoming_photo and bool(models)) or ((not incoming_photo) and bool(photos))
+        display_name = site_kwds.pop("name", None)
+
+        if not other_kind:
+            if spec.get("media"):
+                spec.pop("media", None)
+                self.index["sites"][key] = spec
+                self.writeIndex()
+            kwds = dict(site_kwds)
+            if pointSize is not None:
+                kwds["pointSize"] = pointSize
+            self.addSite(name, mediaURL, mediaType, **kwds)
+            if display_name:
+                self.updateIndex()
+                self.index["sites"][key]["name"] = display_name
+                self.writeIndex()
+            return
+
+        if incoming_photo:
+            photo = {
+                "mediaType": "photosphere",
+                "mediaURL": mediaURL,
+                "name": display_name or (photos[0].get("name") if photos else None) or "Photo",
+            }
+            if "view" in site_kwds:
+                photo["view"] = site_kwds.pop("view")
+            elif photos and photos[0].get("view"):
+                photo["view"] = photos[0]["view"]
+            self._commit_media(name, models + [photo], site_kwds)
+            return
+
+        if not models and photos and spec.get("view") and not photos[0].get("view"):
+            photos[0]["view"] = spec["view"]
+        model = {"mediaType": mediaType, "mediaURL": mediaURL}
+        if display_name:
+            model["name"] = display_name
+        elif any(item.get("mediaURL") == mediaURL and item.get("name") for item in models):
+            model["name"] = next(item["name"] for item in models if item.get("mediaURL") == mediaURL)
+        if pointSize is not None:
+            model["pointSize"] = pointSize
+        elif any(item.get("mediaURL") == mediaURL and item.get("pointSize") is not None for item in models):
+            model["pointSize"] = next(item["pointSize"] for item in models if item.get("mediaURL") == mediaURL)
+        replaced = False
+        new_models = []
+        for item in models:
+            if item.get("mediaURL") == mediaURL:
+                new_models.append(model)
+                replaced = True
+            else:
+                new_models.append(item)
+        if not replaced:
+            new_models.append(model)
+        self._commit_media(name, new_models + photos, site_kwds)
 
     def addSite( self, name, mediaURL, mediaType='cloud', **kwds):
         """
@@ -560,9 +752,13 @@ class VFT(object):
         name : str
             The name of the site to add.
         mediaURL : str
-            The URL of the media (cloud or photosphere) to use for this site.
+            The URL of the media (cloud, mesh, or photosphere) to use for this site.
         mediaType : str
-            The type of this media ("cloud" or "photosphere").
+            The type of this media ("cloud", "mesh", or "photosphere").
+            A site can instead list several objects with a ``media`` array of
+            ``{"mediaType", "mediaURL", "name"}`` entries. Clouds and meshes on
+            one stop get an eye toggle. A photosphere beside a cloud or mesh is
+            a separate view mode; use ``addPhotosphere`` on an existing site.
         
         Keywords
         ---------

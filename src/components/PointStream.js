@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { openGroup, HTTPStore, slice, NestedArray } from "zarr";
 import chroma from 'chroma-js';
 import { disposeAndRemove } from './dispose3d';
+import { noteOrigin } from './sceneFrame';
 import './ThreeScene.css';
 
 const LOAD_INTERVAL = 100; // ms to sleep between loading new chunks
@@ -177,7 +178,13 @@ const fragmentShader = `
     }
 `;
 
-const PointStream = ({ tour, site, three, init, currentMedia }) => {
+function track(entry, object) {
+  if (!entry) return;
+  if (!entry.objects.current.includes(object)) entry.objects.current.push(object);
+  object.visible = entry.visible && !object.userData.superseded;
+}
+
+const PointStream = ({ tour, site, three, init, url, name, frameCamera = true, pointSize }) => {
   // objects that will be added to three.js scene
   const seedPoints = useRef(null); // seeds for streaming dense point cloud
   const densePoints = useRef(null); // dense point cloud
@@ -192,6 +199,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
   const baseColorRef = useRef(null);
   const activeStyleRef = useRef(null);
   const activeGroupRef = useRef(null);
+  const layerRef = useRef(null);
 
   // styling / UI
   const [attrs, setAttrs] = useState(null);
@@ -209,19 +217,29 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
     if (tour.sites[site].view.group) setActiveGroup(tour.sites[site].view.group);
   }, [site]);
 
+  useEffect(() => {
+    const entry = { id: url, name: name || 'cloud', kind: 'model', visible: true, objects: { current: [] } };
+    layerRef.current = entry;
+    if (three.current.registerLayer) three.current.registerLayer(entry);
+    return () => {
+      if (three.current.unregisterLayer) three.current.unregisterLayer(url);
+      layerRef.current = null;
+    };
+  }, [url, name]);
+
   // Load seeds and stream chunks without per-chunk setState
   useEffect(()=> {
     if (!init || nostream ) return;
-    if (sourceRef.current && sourceRef.current.store.url === currentMedia) return;
+    if (sourceRef.current && sourceRef.current.store.url === url) return;
 
     let cancelled = false;
     const controller = new AbortController();
-    console.log(`Loading cloud for ${site} from from ${currentMedia}`);
+    console.log(`Loading cloud for ${site} from from ${url}`);
 
     async function loadZarr() {
       try {
         // connect to zarr object (signal aborts in-flight chunk fetches on site change)
-        const zGroup = await openGroup(new HTTPStore( currentMedia, {
+        const zGroup = await openGroup(new HTTPStore( url, {
           fetchOptions: { signal: controller.signal }
         })); // dataset
         if (cancelled) return;
@@ -244,7 +262,8 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
           activeStyleRef.current = attributes.styles[0];
         }
         three.current.origin = attributes.origin; // update origin (not needed, just in case)
-        three.current.pointSize =  tour.sites[site].pointSize || attributes.resolution; // update point size (very much needed)
+        noteOrigin(three, attributes.origin || [0, 0, 0], true);
+        three.current.pointSize = pointSize || tour.sites[site].pointSize || attributes.resolution; // update point size (very much needed)
         console.log("Cloud attributes are:");
         console.log(attributes);
 
@@ -267,6 +286,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         const seedCloud = new THREE.Points(geometry, material);
         three.current.scene.add(seedCloud);
         seedPoints.current = seedCloud;
+        track(layerRef.current, seedCloud);
     
         // Adjust Camera
         let center = new THREE.Vector3();
@@ -274,7 +294,6 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         bbox.getCenter(center);
         const size = bbox.getSize(new THREE.Vector3()).length();
         const maxDistance = size * 2;
-        three.current.camera.far = maxDistance * 5; // set far clipping plane
         if (site in tour.sites 
             && tour.sites[site].view
             && tour.sites[site].view.tgt){
@@ -283,11 +302,14 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         } else {
           pos = [center.x, center.y-maxDistance/3, center.z+maxDistance/3];
         }
-        three.current.camera.updateProjectionMatrix();
-        three.current.camera.position.set(...pos);
-        three.current.camera.lookAt(center);
-        three.current.controls.target.copy(center);
-        three.current.controls.update();
+        if (frameCamera && three.current.viewMode !== 'photosphere') {
+          three.current.camera.far = maxDistance * 5; // set far clipping plane
+          three.current.camera.updateProjectionMatrix();
+          three.current.camera.position.set(...pos);
+          three.current.camera.lookAt(center);
+          three.current.controls.target.copy(center);
+          three.current.controls.update();
+        }
         if (three.current.invalidate) three.current.invalidate();
 
         while (!cancelled) {
@@ -321,7 +343,8 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         if (streamed[i]) continue; // skip already streamed points
         if (i==0) { // always stream chunk 0 first
           closestIndex = 0;
-          seedPoints.current.visible = false; 
+          seedPoints.current.userData.superseded = true;
+          seedPoints.current.visible = false;
           break;
         } else { // then stream the closest
           const worldPos = new THREE.Vector3(xyz.get([i,0]), xyz.get([i,1]), xyz.get([i,2]));
@@ -383,6 +406,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
         applyCurrentStyle(cloud, points, attributes, activeStyleRef.current, activeGroupRef.current, streamCount, baseColorRef.current);
         three.current.scene.add(cloud);
         densePoints.current = cloud;
+        track(layerRef.current, cloud);
       } else {
         // update existing point cloud (add new points)
         densePoints.current.geometry.attributes.position.array.set(chunkXYZ, streamCount*3);
@@ -413,7 +437,7 @@ const PointStream = ({ tour, site, three, init, currentMedia }) => {
       setAttrs(null);
       setStreamDone(false);
     };
-  }, [init, currentMedia])
+  }, [init, url, frameCamera, pointSize])
 
   // ** Changed Style **
   useEffect( ()=> {

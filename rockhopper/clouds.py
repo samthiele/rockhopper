@@ -296,7 +296,7 @@ def exportZA(points, zarr_store_path,
     # round position information to specific precision
     # (this helps achieve smaller size after compression)
     decimals = int( 1-np.log10( resolution ) )
-    np.round( points, int( decimals ) )
+    points = np.round( points, int( decimals ) )
 
     # Make sure chunk_size is not bigger than total points
     num_points = len( points )
